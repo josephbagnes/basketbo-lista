@@ -249,7 +249,7 @@ const ListingApp = () => {
           )}
           {selectedDateDetails && (
             <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs" title="Share Link">
-              Share<Share className="ml-1 w-4 h-4" />
+              <Share className="w-4 h-4" />
             </Button>
           )}
         </div>
