@@ -3,7 +3,15 @@ import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, orderBy } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  deleteDoc,
+  query,
+  orderBy
+} from "firebase/firestore";
 
 const ListingApp = () => {
   const [name, setName] = useState("");
@@ -30,25 +38,19 @@ const ListingApp = () => {
         const docRef = doc(db, "dates", selectedDate);
         const docSnap = await getDocs(collection(docRef, "registrations"));
         const data = docSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setRegistrations(data.filter((d) => d.status === "confirmed"));
+        setRegistrations(data.filter((d) => d.status === "confirmed").sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
         setWaitlist(data.filter((d) => d.status === "waitlist"));
       };
       fetchRegistrations();
     }
   }, [selectedDate]);
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      weekday: "long",
-    }).toUpperCase().replace(",", "");
-  };
-
   const handleRegister = async () => {
     if (!name) return alert("Please enter your name");
+    if (registrations.some((reg) => reg.name.toLowerCase() === name.toLowerCase()) ||
+        waitlist.some((reg) => reg.name.toLowerCase() === name.toLowerCase())) {
+      return alert("Name already exists!");
+    }
     try {
       const docRef = doc(db, "dates", selectedDate);
       const registrationRef = collection(docRef, "registrations");
@@ -60,7 +62,7 @@ const ListingApp = () => {
       await addDoc(registrationRef, newRegistration);
       setName("");
       alert("Registered successfully!");
-      setRegistrations([...registrations, newRegistration]);
+      setRegistrations([...registrations, newRegistration].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
     } catch (error) {
       console.error("Error registering: ", error);
     }
@@ -90,7 +92,12 @@ const ListingApp = () => {
           >
             {dates.map((date) => (
               <option key={date.id} value={date.id}>
-                {formatDate(date.date)}
+                {new Date(date.date).toLocaleDateString("en-GB", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                  weekday: "long",
+                }).toUpperCase().replace(",", "")}
               </option>
             ))}
           </select>
@@ -98,6 +105,7 @@ const ListingApp = () => {
           <p>No available dates.</p>
         )}
       </Card>
+
       {selectedDate && (
         <Card className="mb-4">
           <label className="block mb-2">Enter Your Name</label>
@@ -117,9 +125,9 @@ const ListingApp = () => {
           <h2 className="text-lg font-semibold mb-2">Registrations</h2>
           {registrations.length > 0 ? (
             <ul className="mb-4">
-              {registrations.map((reg) => (
+              {registrations.map((reg, index) => (
                 <li key={reg.id} className="flex justify-between">
-                  {reg.name} - {new Date(reg.timestamp).toLocaleString()}
+                  {index + 1}. {reg.name} - {new Date(reg.timestamp).toLocaleString()}
                   <Button onClick={() => handleCancel(reg.id)} size="sm">Cancel</Button>
                 </li>
               ))}
