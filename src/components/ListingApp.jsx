@@ -19,6 +19,8 @@ const ListingApp = () => {
   const [selectedDate, setSelectedDate] = useState("");
   const [registrations, setRegistrations] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
+  const [selectedDateDetails, setSelectedDateDetails] = useState(null);
+
 
   useEffect(() => {
     const fetchDates = async () => {
@@ -27,6 +29,7 @@ const ListingApp = () => {
       setDates(fetchedDates);
       if (fetchedDates.length > 0) {
         setSelectedDate(fetchedDates[0].id);
+        setSelectedDateDetails(fetchedDates[0]);
       }
     };
     fetchDates();
@@ -42,10 +45,12 @@ const ListingApp = () => {
         const waitData = waitSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((doc) => doc.id);
         setRegistrations(regData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
         setWaitlist(waitData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+        const dateDetails = dates.find((date) => date.id === selectedDate);
+        setSelectedDateDetails(dateDetails);
       };
       fetchRegistrations();
     }
-  }, [selectedDate]);
+  }, [selectedDate, dates]);
 
   const handleRegister = async () => {
     if (!name) return;
@@ -65,7 +70,7 @@ const ListingApp = () => {
         timestamp: new Date().toISOString(),
       };
       let addedDocRef;
-      if (registrations.length < 25) {
+      if (registrations.length < selectedDateDetails.max) {
         addedDocRef = await addDoc(collection(docRef, "registrations"), newRegistration);
         setRegistrations([...registrations, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
       } else {
@@ -103,9 +108,8 @@ const ListingApp = () => {
   };
 
   return (
-    <div className="p-4">
-      <Card className="mb-4">
-        <label className="block mb-2">Select Date</label>
+    <div className="p-1">
+      <Card className="mb-4 text-sm">
         {dates.length > 0 ? (
           <select
             value={selectedDate}
@@ -126,38 +130,53 @@ const ListingApp = () => {
         ) : (
           <p>No available dates.</p>
         )}
+        {selectedDateDetails && (
+          <div className="mt-2">
+            <p><strong>Venue:</strong> {selectedDateDetails.venue} (Max: {selectedDateDetails.max} players)</p>
+            <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
+          </div>
+        )}
       </Card>
 
       {selectedDate && (
-        <Card className="mb-4">
-          <label className="block mb-2">Enter Your Name</label>
+        <Card className="mb-4 text-sm">
           <Input
-            placeholder="Your name"
+            placeholder="Enter name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
             className="mb-2"
           />
-          <Button className="w-full" onClick={handleRegister}>Register</Button>
+          <Button onClick={handleRegister} size="md" className="text-md ml-2">Register</Button>
         </Card>
       )}
 
       {(registrations.length > 0 || waitlist.length > 0) && (
         <Card className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">Registrations</h2>
+          <h2 className="text-md font-semibold my-3">Registrations</h2>
           {registrations.map((reg, index) => (
-            <li key={`reg-${reg.id}`} className="flex justify-between">
-              {index + 1}. {reg.name} - {new Date(reg.timestamp).toLocaleString()}
-              <Button onClick={() => handleCancel(reg.id)} size="sm">Cancel</Button>
+            <li key={`reg-${reg.id}`} className="flex justify-between items-center mb-1">
+              <div>
+                <span className="text-xs">{index + 1}. {reg.name}</span>
+                <span className="text-[10px] text-gray-500 ml-2 italic">
+                  {new Date(reg.timestamp).toLocaleString()}
+                </span>
+              </div>
+              <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-300 text-xs py-0.5">Cancel</Button>
             </li>
           ))}
           {waitlist.length > 0 && (
             <>
-              <h3 className="font-semibold mb-2">Waitlist</h3>
+              <h3 className="text-md font-semibold mt-4 mb-2">Waitlist</h3>
               {waitlist.map((reg, index) => (
-                <li key={`wait-${reg.id}`} className="flex justify-between">
-                  {index + 1}. {reg.name} - {new Date(reg.timestamp).toLocaleString()}
-                  <Button onClick={() => handleCancel(reg.id, true)} size="sm">Cancel</Button>
+                <li key={`wait-${reg.id}`} className="flex justify-between items-center mb-1">
+                  <div>
+                  <span className="text-xs">{index + 1}. {reg.name}</span>
+                    <span className="text-[10px] text-gray-500 ml-2 italic">
+                      {new Date(reg.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                  <Button onClick={() => handleCancel(reg.id, true)} size="sm" className="bg-red-300 text-xs py-0.5">Cancel</Button>
                 </li>
               ))}
             </>
