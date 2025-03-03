@@ -162,7 +162,7 @@ const ListingApp = () => {
                   {new Date(reg.timestamp).toLocaleString()}
                 </span>
               </div>
-              <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-300 text-xs py-0.5">Cancel</Button>
+              <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-300 text-xs py-1">Cancel</Button>
             </li>
           ))}
           {waitlist.length > 0 && (
@@ -176,7 +176,7 @@ const ListingApp = () => {
                       {new Date(reg.timestamp).toLocaleString()}
                     </span>
                   </div>
-                  <Button onClick={() => handleCancel(reg.id, true)} size="sm" className="bg-red-300 text-xs py-0.5">Cancel</Button>
+                  <Button onClick={() => handleCancel(reg.id, true)} size="sm" className="bg-red-300 text-xs py-1">Cancel</Button>
                 </li>
               ))}
             </>
