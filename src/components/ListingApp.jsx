@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CalendarPlus, Share } from "lucide-react";
+import { CalendarPlus, Share, Link, Trash } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -219,8 +219,11 @@ const ListingApp = () => {
 
   return (
     <div className="p-1">
-      <div className="bg-blue-200 text-gray py-4 px-6 mb-4 rounded-md shadow-md">
+      <div className="flex items-center justify-between bg-blue-200 text-gray py-4 px-6 mb-4 rounded-md shadow-md">
         <h1 className="text-xl font-semibold">Basketbo-Lista&trade;</h1>
+        <Button onClick={handleAddEvent} size="sm" className="text-sm bg-gray-500" title="Add Event (For Admin)">
+          <CalendarPlus className="w-4 h-4" />
+        </Button>
       </div>
 
       <Card className="mb-4 text-sm">
@@ -229,15 +232,14 @@ const ListingApp = () => {
             <select
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="p-2 border rounded text-xs"
+              className="p-2 border rounded text-md"
             >
               {dates.map((date) => (
                 <option key={date.id} value={date.id}>
                   {new Date(date.date).toLocaleDateString("en-GB", {
                     year: "numeric",
                     month: "short",
-                    day: "numeric",
-                    weekday: "long",
+                    day: "numeric"
                   }).toUpperCase().replace(",", "")} / {date.venue} / {date.time}
                 </option>
               ))}
@@ -245,12 +247,11 @@ const ListingApp = () => {
           ) : (
             <p>No available dates.</p>
           )}
-          <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-blue-200" title="Share Link">
-            <Share className="w-4 h-4" />
-          </Button>
-          <Button onClick={handleAddEvent} size="sm" className="flex items-center text-sm bg-purple-200" title="Add Event (For Admin)">
-            <CalendarPlus className="w-4 h-4" />
-          </Button>
+          {selectedDateDetails && (
+            <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs" title="Share Link">
+              Share<Share className="ml-1 w-4 h-4" />
+            </Button>
+          )}
         </div>
         {selectedDateDetails && (
           <div className="mt-2">
@@ -299,7 +300,7 @@ const ListingApp = () => {
           {registrations.map((reg, index) => (
             <li key={`reg-${reg.id}`} className="flex justify-between items-center mb-1">
               <div>
-                <span className="text-xs">{index + 1}. {reg.name}</span>
+                <span className="text-sm">{index + 1}. {reg.name}</span>
                 <span className="text-[10px] text-gray-500 ml-2 italic">
                   {new Date(reg.timestamp).toLocaleString("en-GB", { hour12: true, hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric', year: 'numeric' })}
                 </span>
@@ -312,7 +313,9 @@ const ListingApp = () => {
                   if (window.confirm(`Sure to cancel ${reg.name}'s registration?`)) {
                     handleCancel(reg.id);
                   }
-                }} size="sm" className="bg-red-400 text-xs py-1 mr-1">Cancel</Button>
+                }} size="sm" className="bg-red-400 text-xs py-1 mr-1" title="Cancel Registration">
+                  <Trash className="ml-1 w-4 h-4" />
+                </Button>
               </div>
             </li>
           ))}
@@ -322,7 +325,7 @@ const ListingApp = () => {
               {waitlist.map((reg, index) => (
                 <li key={`wait-${reg.id}`} className="flex justify-between items-center mb-1">
                   <div>
-                  <span className="text-xs">{index + 1}. {reg.name}</span>
+                  <span className="text-sm">{index + 1}. {reg.name}</span>
                     <span className="text-[10px] text-gray-500 ml-2 italic">
                       {new Date(reg.timestamp).toLocaleString("en-GB", { hour12: true, hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric', year: 'numeric' })}
                     </span>
@@ -331,7 +334,8 @@ const ListingApp = () => {
                   if (window.confirm(`Sure to cancel ${reg.name}'s waitlist registration?`)) {
                     handleCancel(reg.id, true);
                   }
-                }} size="sm" className="bg-red-400 text-xs py-1">Cancel</Button>
+                }} size="sm" className="bg-red-400 text-xs py-1" title="Cancel Registration">
+                  <Trash className="ml-1 w-4 h-4" /></Button>
                 </li>
               ))}
             </>
