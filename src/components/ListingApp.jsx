@@ -9,6 +9,7 @@ import {
   getDocs,
   doc,
   deleteDoc,
+  updateDoc,
   query,
   orderBy
 } from "firebase/firestore";
@@ -107,6 +108,18 @@ const ListingApp = () => {
     }
   };
 
+  const handleTogglePaid = async (id, isPaid) => {
+    try {
+      const docRef = doc(db, "dates", selectedDate, "registrations", id);
+      await updateDoc(docRef, { paid: !isPaid });
+      setRegistrations(registrations.map((reg) =>
+        reg.id === id ? { ...reg, paid: !isPaid } : reg
+      ));
+    } catch (error) {
+      console.error("Error updating payment status: ", error);
+    }
+  };
+
   return (
     <div className="p-1">
       <Card className="mb-4 text-sm">
@@ -159,10 +172,19 @@ const ListingApp = () => {
               <div>
                 <span className="text-xs">{index + 1}. {reg.name}</span>
                 <span className="text-[10px] text-gray-500 ml-2 italic">
-                  {new Date(reg.timestamp).toLocaleString()}
+                  {new Date(reg.timestamp).toLocaleString("en-GB", { hour12: true, hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric', year: 'numeric' })}
                 </span>
               </div>
-              <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-300 text-xs py-1">Cancel</Button>
+              <div className="flex items-center space-x-1">
+                <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs py-1 w-20">
+                  {reg.paid ? "Paid" : "Unpaid"}
+                </Button>
+                <Button onClick={() => {
+                  if (window.confirm(`Sure to cancel ${reg.name}'s registration?`)) {
+                    handleCancel(reg.id);
+                  }
+                }} size="sm" className="bg-red-400 text-xs py-1 mr-1">Cancel</Button>
+              </div>
             </li>
           ))}
           {waitlist.length > 0 && (
@@ -173,10 +195,14 @@ const ListingApp = () => {
                   <div>
                   <span className="text-xs">{index + 1}. {reg.name}</span>
                     <span className="text-[10px] text-gray-500 ml-2 italic">
-                      {new Date(reg.timestamp).toLocaleString()}
+                      {new Date(reg.timestamp).toLocaleString("en-GB", { hour12: true, hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric', year: 'numeric' })}
                     </span>
                   </div>
-                  <Button onClick={() => handleCancel(reg.id, true)} size="sm" className="bg-red-300 text-xs py-1">Cancel</Button>
+                  <Button onClick={() => {
+                  if (window.confirm(`Sure to cancel ${reg.name}'s waitlist registration?`)) {
+                    handleCancel(reg.id, true);
+                  }
+                }} size="sm" className="bg-red-400 text-xs py-1">Cancel</Button>
                 </li>
               ))}
             </>
