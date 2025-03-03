@@ -36,45 +36,63 @@ const ListingApp = () => {
     if (selectedDate) {
       const fetchRegistrations = async () => {
         const docRef = doc(db, "dates", selectedDate);
-        const docSnap = await getDocs(collection(docRef, "registrations"));
-        const data = docSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setRegistrations(data.filter((d) => d.status === "confirmed").sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-        setWaitlist(data.filter((d) => d.status === "waitlist"));
+        const regSnap = await getDocs(collection(docRef, "registrations"));
+        const waitSnap = await getDocs(collection(docRef, "waitlist"));
+        const regData = regSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((doc) => doc.id);
+        const waitData = waitSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((doc) => doc.id);
+        setRegistrations(regData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+        setWaitlist(waitData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
       };
       fetchRegistrations();
     }
   }, [selectedDate]);
 
   const handleRegister = async () => {
-    if (!name) return alert("Please enter your name");
+    if (!name) return;
     if (registrations.some((reg) => reg.name.toLowerCase() === name.toLowerCase()) ||
         waitlist.some((reg) => reg.name.toLowerCase() === name.toLowerCase())) {
-      return alert("Name already exists!");
+      alert("Name already exists!");
+      return;
     }
     try {
       const docRef = doc(db, "dates", selectedDate);
-      const registrationRef = collection(docRef, "registrations");
       const newRegistration = {
         name,
         timestamp: new Date().toISOString(),
-        status: registrations.length < 25 ? "confirmed" : "waitlist"
       };
-      await addDoc(registrationRef, newRegistration);
+      let addedDocRef;
+      if (registrations.length < 25) {
+        addedDocRef = await addDoc(collection(docRef, "registrations"), newRegistration);
+        setRegistrations([...registrations, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+      } else {
+        addedDocRef = await addDoc(collection(docRef, "waitlist"), newRegistration);
+        setWaitlist([...waitlist, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+      }
       setName("");
-      alert("Registered successfully!");
-      setRegistrations([...registrations, newRegistration].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
     } catch (error) {
       console.error("Error registering: ", error);
     }
   };
 
-  const handleCancel = async (id) => {
+  const handleCancel = async (id, isWaitlist = false) => {
     try {
-      const docRef = doc(db, "dates", selectedDate, "registrations", id);
+      const collectionName = isWaitlist ? "waitlist" : "registrations";
+      const docRef = doc(db, "dates", selectedDate, collectionName, id);
       await deleteDoc(docRef);
-      setRegistrations(registrations.filter((reg) => reg.id !== id));
-      setWaitlist(waitlist.filter((reg) => reg.id !== id));
-      alert("Registration cancelled.");
+
+      if (isWaitlist) {
+        setWaitlist(waitlist.filter((reg) => reg.id !== id));
+      } else {
+        setRegistrations(registrations.filter((reg) => reg.id !== id));
+        if (waitlist.length > 0) {
+          const earliestWaitlist = waitlist[0];
+          const waitlistRef = doc(db, "dates", selectedDate, "waitlist", earliestWaitlist.id);
+          await deleteDoc(waitlistRef);
+          await addDoc(collection(db, "dates", selectedDate, "registrations"), earliestWaitlist);
+          setRegistrations([...registrations.filter((reg) => reg.id !== id), earliestWaitlist].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+          setWaitlist(waitlist.slice(1));
+        }
+      }
     } catch (error) {
       console.error("Error cancelling registration: ", error);
     }
@@ -123,29 +141,21 @@ const ListingApp = () => {
       {(registrations.length > 0 || waitlist.length > 0) && (
         <Card className="mb-4">
           <h2 className="text-lg font-semibold mb-2">Registrations</h2>
-          {registrations.length > 0 ? (
-            <ul className="mb-4">
-              {registrations.map((reg, index) => (
-                <li key={reg.id} className="flex justify-between">
-                  {index + 1}. {reg.name} - {new Date(reg.timestamp).toLocaleString()}
-                  <Button onClick={() => handleCancel(reg.id)} size="sm">Cancel</Button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No confirmed registrations.</p>
-          )}
+          {registrations.map((reg, index) => (
+            <li key={`reg-${reg.id}`} className="flex justify-between">
+              {index + 1}. {reg.name} - {new Date(reg.timestamp).toLocaleString()}
+              <Button onClick={() => handleCancel(reg.id)} size="sm">Cancel</Button>
+            </li>
+          ))}
           {waitlist.length > 0 && (
             <>
               <h3 className="font-semibold mb-2">Waitlist</h3>
-              <ul>
-                {waitlist.map((reg) => (
-                  <li key={reg.id} className="flex justify-between">
-                    {reg.name} (Waitlist) - {new Date(reg.timestamp).toLocaleString()}
-                    <Button onClick={() => handleCancel(reg.id)} size="sm">Cancel</Button>
-                  </li>
-                ))}
-              </ul>
+              {waitlist.map((reg, index) => (
+                <li key={`wait-${reg.id}`} className="flex justify-between">
+                  {index + 1}. {reg.name} - {new Date(reg.timestamp).toLocaleString()}
+                  <Button onClick={() => handleCancel(reg.id, true)} size="sm">Cancel</Button>
+                </li>
+              ))}
             </>
           )}
         </Card>
