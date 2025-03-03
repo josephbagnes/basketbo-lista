@@ -49,6 +49,10 @@ const ListingApp = () => {
 
   const handleRegister = async () => {
     if (!name) return;
+    if (name.length < 1 || name.length > 20) {
+      alert("Name must be between 1 and 20 characters long.");
+      return;
+    }
     if (registrations.some((reg) => reg.name.toLowerCase() === name.toLowerCase()) ||
         waitlist.some((reg) => reg.name.toLowerCase() === name.toLowerCase())) {
       alert("Name already exists!");
