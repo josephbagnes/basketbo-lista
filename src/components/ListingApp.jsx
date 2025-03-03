@@ -105,6 +105,7 @@ const ListingApp = () => {
             placeholder="Your name"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
             className="mb-2"
           />
           <Button className="w-full" onClick={handleRegister}>Register</Button>
@@ -118,7 +119,7 @@ const ListingApp = () => {
             <ul className="mb-4">
               {registrations.map((reg) => (
                 <li key={reg.id} className="flex justify-between">
-                  {reg.name} (Confirmed) - {new Date(reg.timestamp).toLocaleString()}
+                  {reg.name} - {new Date(reg.timestamp).toLocaleString()}
                   <Button onClick={() => handleCancel(reg.id)} size="sm">Cancel</Button>
                 </li>
               ))}
