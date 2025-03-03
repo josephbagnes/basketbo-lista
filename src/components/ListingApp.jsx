@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { CalendarPlus, Share } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,28 @@ const ListingApp = () => {
   const [registrations, setRegistrations] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
+  const [showEventModal, setShowEventModal] = useState(false);
 
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const date = urlParams.get("date");
+    const venue = urlParams.get("venue");
+    const time = urlParams.get("time");
+
+    if (date && venue && time) {
+      const matchedEvent = dates.find(
+        (event) =>
+          event.date === date &&
+          event.venue === venue &&
+          event.time === time
+      );
+      if (matchedEvent) {
+        setSelectedDate(matchedEvent.id);
+        setSelectedDateDetails(matchedEvent);
+      }
+    }
+  }, [dates]);
 
   useEffect(() => {
     const fetchDates = async () => {
@@ -35,6 +57,7 @@ const ListingApp = () => {
     };
     fetchDates();
   }, []);
+
 
   useEffect(() => {
     if (selectedDate) {
@@ -120,36 +143,142 @@ const ListingApp = () => {
     }
   };
 
+  const handleAddEvent = async () => {
+    const pin = prompt("Enter Admin PIN:");
+    if (!pin) return;
+    const adminsSnapshot = await getDocs(collection(db, "admins"));
+    const validAdmin = adminsSnapshot.docs.find((doc) => doc.data().pin === pin);
+    if (validAdmin) {
+      setShowEventModal(true);
+    } else {
+      alert("Invalid Admin PIN!");
+    }
+  };
+
+  const submitEvent = async (event) => {
+    event.preventDefault();
+    const date = event.target.date.value;
+    const venue = event.target.venue.value;
+    const maxPlayers = parseInt(event.target.maxPlayers.value, 10);
+    const payTo = event.target.payTo.value;
+    const time = event.target.time.value;
+    if (date && venue && maxPlayers && payTo && time) {
+      try {
+        const querySnapshot = await getDocs(collection(db, "dates"));
+        const existingEvents = querySnapshot.docs.map(doc => doc.data());
+        
+        // Check for duplicate date, venue, and time
+        const isDuplicate = existingEvents.some(event =>
+            event.date === new Date(date).toISOString() &&
+            event.venue === venue &&
+            event.time === time
+        );
+
+        if (isDuplicate) {
+            alert("An event with the same date, venue, and time already exists!");
+            return;
+        }
+        
+        await addDoc(collection(db, "dates"), {
+          date: new Date(date).toISOString(),
+          venue: venue,
+          max: maxPlayers,
+          pay_to: payTo,
+          time: time
+        });
+        alert("Event added successfully!");
+        setShowEventModal(false);
+        const fetchDates = async () => {
+          const querySnapshot = await getDocs(query(collection(db, "dates"), orderBy("date", "desc")));
+          const fetchedDates = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+          setDates(fetchedDates);
+          if (fetchedDates.length > 0) {
+            setSelectedDate(fetchedDates[0].id);
+            setSelectedDateDetails(fetchedDates[0]);
+          }
+        };
+        await fetchDates();
+      } catch (error) {
+        console.error("Error adding event: ", error);
+      }
+    } else {
+      alert("All fields are required!");
+    }
+  };
+
+  const generateShareableLink = () => {
+    if (selectedDateDetails) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("date", selectedDateDetails.date);
+      url.searchParams.set("venue", selectedDateDetails.venue);
+      url.searchParams.set("time", selectedDateDetails.time);
+      navigator.clipboard.writeText(url.toString());
+      alert("Shareable link copied to clipboard!");
+    }
+  };
+
   return (
     <div className="p-1">
+      <div className="bg-blue-200 text-gray py-4 px-6 mb-4 rounded-md shadow-md">
+        <h1 className="text-xl font-semibold">Basketbo-Lista&trade;</h1>
+      </div>
+
       <Card className="mb-4 text-sm">
-        {dates.length > 0 ? (
-          <select
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="p-2 border rounded mb-4"
-          >
-            {dates.map((date) => (
-              <option key={date.id} value={date.id}>
-                {new Date(date.date).toLocaleDateString("en-GB", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                  weekday: "long",
-                }).toUpperCase().replace(",", "")}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <p>No available dates.</p>
-        )}
+        <div className="flex items-center space-x-2 mb-6">
+          {dates.length > 0 ? (
+            <select
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="p-2 border rounded text-xs"
+            >
+              {dates.map((date) => (
+                <option key={date.id} value={date.id}>
+                  {new Date(date.date).toLocaleDateString("en-GB", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    weekday: "long",
+                  }).toUpperCase().replace(",", "")} / {date.venue} / {date.time}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p>No available dates.</p>
+          )}
+          <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-blue-200" title="Share Link">
+            <Share className="w-4 h-4" />
+          </Button>
+          <Button onClick={handleAddEvent} size="sm" className="flex items-center text-sm bg-purple-200" title="Add Event (For Admin)">
+            <CalendarPlus className="w-4 h-4" />
+          </Button>
+        </div>
         {selectedDateDetails && (
           <div className="mt-2">
             <p><strong>Venue:</strong> {selectedDateDetails.venue} (Max: {selectedDateDetails.max} players)</p>
+            <p><strong>Time:</strong> {selectedDateDetails.time}</p>
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
         )}
       </Card>
+
+      {showEventModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center text-sm">
+          <div className="bg-white p-6 rounded shadow-md max-w-sm w-full">
+            <h2 className="text-lg mb-4">Add New Event</h2>
+            <form onSubmit={submitEvent} className="flex flex-col">
+              <Input type="date" name="date" className="mb-2" required />
+              <Input placeholder="Venue" name="venue" className="mb-3" required />
+              <Input placeholder="Max Players" name="maxPlayers" type="number" defaultValue={25} className="mb-3" required />
+              <Input placeholder="Pay To" name="payTo" className="mb-3" required />
+              <Input placeholder="Time (e.g., 7-10 PM)" name="time" className="mb-5" required />
+              <div className="flex justify-end space-x-2">
+                <Button type="submit">Submit</Button>
+                <Button type="button" className="bg-gray-400" onClick={() => setShowEventModal(false)}>Cancel</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {selectedDate && (
         <Card className="mb-4 text-sm">
