@@ -8,6 +8,7 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc,
   doc,
   deleteDoc,
   updateDoc,
@@ -18,6 +19,7 @@ import {
 
 const ListingApp = () => {
   const [name, setName] = useState("");
+  const [regPin, setRegPin] = useState("");
   const [dates, setDates] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
   const [registrations, setRegistrations] = useState([]);
@@ -82,7 +84,12 @@ const ListingApp = () => {
   const handleRegister = async () => {
     if (!name) return;
     if (name.length < 1 || name.length > 20) {
-      alert("Name must be between 1 and 20 characters long.");
+      alert("Name must be 1-20 characters long");
+      return;
+    }
+    if (!regPin) return;
+    if (regPin.length < 4 || regPin.length > 10) {
+      alert("PIN must be 4-10 characters long");
       return;
     }
 
@@ -114,6 +121,7 @@ const ListingApp = () => {
       const newRegistration = {
         name,
         timestamp: new Date().toISOString(),
+        pin: regPin,
       };
       let addedDocRef;
       if (fetchedRegistrations.length < selectedDateDetails.max) {
@@ -131,8 +139,28 @@ const ListingApp = () => {
 
   const handleCancel = async (id, isWaitlist = false) => {
     try {
+      const pin = prompt("Enter Registration PIN or Admin PIN to cancel:");
+      if (!pin) return;
+
+      const adminsSnapshot = await getDocs(collection(db, "admins"));
+      const isAdmin = adminsSnapshot.docs.some((doc) => doc.data().pin === pin);
+
       const collectionName = isWaitlist ? "waitlist" : "registrations";
       const docRef = doc(db, "dates", selectedDate, collectionName, id);
+      const registrationDoc = await getDoc(docRef);
+
+      if (!isAdmin && !registrationDoc.data().pin) {
+        alert("Registration has no PIN, only Admin can cancel");
+        return;
+      }
+
+      const isPinMatching = registrationDoc.data().pin === pin;
+
+      if (!isAdmin && !isPinMatching) {
+        alert("Invalid PIN!");
+        return;
+      }
+
       await deleteDoc(docRef);
 
       if (isWaitlist) {
@@ -159,7 +187,27 @@ const ListingApp = () => {
 
   const handleTogglePaid = async (id, isPaid) => {
     try {
+
+      const pin = prompt("Enter Registration PIN or Admin PIN to update payment:");
+      if (!pin) return;
+
+      const adminsSnapshot = await getDocs(collection(db, "admins"));
+      const isAdmin = adminsSnapshot.docs.some((doc) => doc.data().pin === pin);
       const docRef = doc(db, "dates", selectedDate, "registrations", id);
+      const registrationDoc = await getDoc(docRef);
+
+      if (!isAdmin && !registrationDoc.data().pin) {
+        alert("Registration has no PIN, only Admin can update payment status");
+        return;
+      }
+
+      const isPinMatching = registrationDoc.data().pin === pin;
+
+      if (!isAdmin && !isPinMatching) {
+        alert("Invalid PIN!");
+        return;
+      }
+
       await updateDoc(docRef, { paid: !isPaid });
       setRegistrations(registrations.map((reg) =>
         reg.id === id ? { ...reg, paid: !isPaid } : reg
@@ -369,6 +417,13 @@ const ListingApp = () => {
             onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
             className="mb-2 w-full"
           />
+          <Input
+            placeholder="Enter registration PIN here"
+            value={regPin}
+            onChange={(e) => setRegPin(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
+            className="mb-2 w-full"
+          />
           <Button onClick={handleRegister} size="md" className="text-md">Register</Button>
         </Card>
       )}
@@ -388,11 +443,7 @@ const ListingApp = () => {
                 <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs py-1 w-20">
                   {reg.paid ? "Paid" : "Unpaid"}
                 </Button>
-                <Button onClick={() => {
-                  if (window.confirm(`Sure to cancel ${reg.name}'s registration?`)) {
-                    handleCancel(reg.id);
-                  }
-                }} size="sm" className="bg-red-400 text-xs py-1 mr-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
+                <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-400 text-xs py-1 mr-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="ml-1 w-4 h-4" />
                 </Button>
               </div>
@@ -409,11 +460,7 @@ const ListingApp = () => {
                       {new Date(reg.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
-                  <Button onClick={() => {
-                  if (window.confirm(`Sure to cancel ${reg.name}'s waitlist registration?`)) {
-                    handleCancel(reg.id, true);
-                  }
-                }} size="sm" className="bg-red-400 text-xs py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
+                  <Button onClick={() => handleCancel(reg.id, true)} size="sm" className="bg-red-400 text-xs py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="ml-1 w-4 h-4" /></Button>
                 </li>
               ))}
