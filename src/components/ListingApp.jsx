@@ -25,6 +25,7 @@ const ListingApp = () => {
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isOpenForRegistration, setIsOpenForRegistration] = useState(false);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -54,6 +55,7 @@ const ListingApp = () => {
       if (fetchedDates.length > 0) {
         setSelectedDate(fetchedDates[0].id);
         setSelectedDateDetails(fetchedDates[0]);
+        setIsOpenForRegistration(fetchedDates[0].isOpenForRegistration ?? false);
       }
     };
     fetchDates();
@@ -200,6 +202,7 @@ const ListingApp = () => {
     const maxPlayers = parseInt(event.target.maxPlayers.value, 10);
     const payTo = event.target.payTo.value;
     const time = event.target.time.value;
+    const isOpen = event.target.isOpen.checked;
     if (date && venue && maxPlayers && payTo && time) {
       try {
         const querySnapshot = await getDocs(collection(db, "dates"));
@@ -226,23 +229,26 @@ const ListingApp = () => {
             venue: venue,
             max: maxPlayers,
             pay_to: payTo,
-            time: time
+            time: time,
+            isOpenForRegistration: isOpen,
           });
           alert("Event updated successfully!");
-          setSelectedDateDetails({ id: selectedDate, date: new Date(date).toISOString(), venue: venue, max: maxPlayers, pay_to: payTo, time: time });
+          setSelectedDateDetails({ id: selectedDate, date: new Date(date).toISOString(), venue: venue, max: maxPlayers, pay_to: payTo, time: time, isOpenForRegistration: isOpenForRegistration });
         } else {
           const newDateAdded = await addDoc(collection(db, "dates"), {
             date: new Date(date).toISOString(),
             venue: venue,
             max: maxPlayers,
             pay_to: payTo,
-            time: time
+            time: time,
+            isOpenForRegistration: isOpen,
           });
           alert("Event added successfully!");
           setSelectedDate(newDateAdded.id);
-          setSelectedDateDetails({ id: newDateAdded.id, date: new Date(date).toISOString(), venue: venue, max: maxPlayers, pay_to: payTo, time: time });
+          setSelectedDateDetails({ id: newDateAdded.id, date: new Date(date).toISOString(), venue: venue, max: maxPlayers, pay_to: payTo, time: time, isOpenForRegistration: isOpenForRegistration });
         }
         
+        setIsOpenForRegistration(isOpen);
         setShowEventModal(false);
         const fetchDates = async () => {
           const querySnapshot = await getDocs(query(collection(db, "dates"), orderBy("date", "desc")));
@@ -285,7 +291,12 @@ const ListingApp = () => {
           {dates.length > 0 ? (
             <select
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => {
+                const selected = dates.find((date) => date.id === e.target.value);
+                setSelectedDate(e.target.value);
+                setSelectedDateDetails(selected);
+                setIsOpenForRegistration(selected.isOpenForRegistration ?? false);
+              }}
               className="p-2 border rounded text-md"
             >
               {dates.map((date) => (
@@ -303,7 +314,7 @@ const ListingApp = () => {
           )}
           
         </div>
-        {selectedDateDetails && (
+        {selectedDateDetails && isOpenForRegistration && (
           <div className="mt-2 mb-4">
             <p><strong>Venue:</strong> {selectedDateDetails.venue}</p>
             <p><strong>Max:</strong> {selectedDateDetails.max} players</p>
@@ -333,6 +344,13 @@ const ListingApp = () => {
               <Input placeholder="Max Players" name="maxPlayers" type="number" className="mb-3" required defaultValue={isEditMode ? selectedDateDetails?.max : ""} />
               <Input placeholder="Pay To" name="payTo" className="mb-3" required defaultValue={isEditMode ? selectedDateDetails?.pay_to : ""} />
               <Input placeholder="Time (e.g., 7-10 PM)" name="time" className="mb-5" required defaultValue={isEditMode ? selectedDateDetails?.time : ""} />
+              <Input
+                type="checkbox"
+                label="Registration Open"
+                defaultChecked={selectedDateDetails?.isOpenForRegistration}
+                name="isOpen"
+                className="mb-4"
+              />
               <div className="flex justify-end space-x-2">
                 <Button type="submit">Submit</Button>
                 <Button type="button" className="bg-gray-400" onClick={() => setShowEventModal(false)}>Cancel</Button>
@@ -342,7 +360,7 @@ const ListingApp = () => {
         </div>
       )}
 
-      {selectedDate && (
+      {selectedDate && isOpenForRegistration && (
         <Card className="mb-4 text-sm">
           <Input
             placeholder="Enter name here"
@@ -355,7 +373,7 @@ const ListingApp = () => {
         </Card>
       )}
 
-      {(registrations.length > 0 || waitlist.length > 0) && (
+      {isOpenForRegistration && (registrations.length > 0 || waitlist.length > 0) && (
         <Card className="mb-4">
           <h2 className="text-md font-semibold my-3">Registrations</h2>
           {registrations.map((reg, index) => (
@@ -401,6 +419,11 @@ const ListingApp = () => {
               ))}
             </>
           )}
+        </Card>
+      )}
+      {!isOpenForRegistration && (
+        <Card className="mb-4 text-sm">
+          <p className="italic">Not open for registration yet</p>
         </Card>
       )}
     </div>
