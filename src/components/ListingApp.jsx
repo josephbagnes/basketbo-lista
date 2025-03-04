@@ -391,7 +391,7 @@ ${(waitlist || []).map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`;
             <p><strong>Time:</strong> {selectedDateDetails.time}</p>
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
-          <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-gray-300 text-xs" title="Copy Details">
+          <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-gray-400 text-xs" title="Copy Details">
             Copy Details<Copy className="ml-1 w-4 h-4" />
           </Button>
         </Card>
