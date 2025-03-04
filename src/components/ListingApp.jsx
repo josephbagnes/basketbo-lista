@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CalendarPlus, Share, Link, Trash, Pencil } from "lucide-react";
+import { List, CalendarPlus, Share, Link, Trash, Pencil } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,13 @@ const ListingApp = () => {
   const [regPin, setRegPin] = useState("");
   const [dates, setDates] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDateModal, setSelectedDateModal] = useState("");
+  const [selectedDateModalDetails, setSelectedDateModalDetails] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
+  const [showListEventModal, setShowListEventModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isOpenForRegistration, setIsOpenForRegistration] = useState(false);
 
@@ -45,6 +48,7 @@ const ListingApp = () => {
       if (matchedEvent) {
         setSelectedDate(matchedEvent.id);
         setSelectedDateDetails(matchedEvent);
+        setIsOpenForRegistration(matchedEvent.isOpenForRegistration ?? false);
       }
     }
   }, [dates]);
@@ -54,11 +58,6 @@ const ListingApp = () => {
       const querySnapshot = await getDocs(query(collection(db, "dates"), orderBy("date", "desc")));
       const fetchedDates = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setDates(fetchedDates);
-      if (fetchedDates.length > 0) {
-        setSelectedDate(fetchedDates[0].id);
-        setSelectedDateDetails(fetchedDates[0]);
-        setIsOpenForRegistration(fetchedDates[0].isOpenForRegistration ?? false);
-      }
     };
     fetchDates();
   }, []);
@@ -95,8 +94,6 @@ const ListingApp = () => {
 
     try {
       const docRef = doc(db, "dates", selectedDate);
-
-      // Re-fetch the latest registrations and waitlist from Firestore
       const registrationsSnapshot = await getDocs(collection(docRef, "registrations"));
       const fetchedRegistrations = registrationsSnapshot.docs.map((doc) => ({
         id: doc.id,
@@ -230,17 +227,32 @@ const ListingApp = () => {
     }
   };
 
-  const handleEditEvent = async () => {
+  const handleListEvent = async () => {
     const pin = prompt("Enter Admin PIN:");
     if (!pin) return;
     const adminsSnapshot = await getDocs(collection(db, "admins"));
     const validAdmin = adminsSnapshot.docs.find((doc) => doc.data().pin === pin);
     if (validAdmin) {
-      setIsEditMode(true);
-      setShowEventModal(true);
+      const fetchDates = async () => {
+        const querySnapshot = await getDocs(query(collection(db, "dates"), orderBy("date", "desc")));
+        const fetchedDates = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setDates(fetchedDates);
+        if (fetchedDates.length > 0) {
+          setSelectedDateModal(fetchedDates[0].id);
+          setSelectedDateModalDetails(fetchedDates[0]);
+        }
+      };
+      fetchDates();
+      setShowListEventModal(true);
     } else {
       alert("Invalid Admin PIN!");
     }
+  };
+
+  const handleEditEvent = async () => {
+    setShowListEventModal(false);
+    setIsEditMode(true);
+    setShowEventModal(true);
   };
 
   const submitEvent = async (event) => {
@@ -262,7 +274,7 @@ const ListingApp = () => {
               eventDate === inputDate &&
               event.venue === venue &&
               event.time === time &&
-              (!isEditMode || event.id !== selectedDate)
+              (!isEditMode || event.id !== selectedDateModal)
           );
         });
 
@@ -272,7 +284,7 @@ const ListingApp = () => {
         }
 
         if (isEditMode) {
-          await updateDoc(doc(db, "dates", selectedDate), {
+          await updateDoc(doc(db, "dates", selectedDateModal), {
             date: new Date(date).toISOString(),
             venue: venue,
             max: maxPlayers,
@@ -281,7 +293,7 @@ const ListingApp = () => {
             isOpenForRegistration: isOpen,
           });
           alert("Event updated successfully!");
-          setSelectedDateDetails({ id: selectedDate, date: new Date(date).toISOString(), venue: venue, max: maxPlayers, pay_to: payTo, time: time, isOpenForRegistration: isOpenForRegistration });
+          setSelectedDateDetails({ id: selectedDateModal, date: new Date(date).toISOString(), venue: venue, max: maxPlayers, pay_to: payTo, time: time, isOpenForRegistration: isOpenForRegistration });
         } else {
           const newDateAdded = await addDoc(collection(db, "dates"), {
             date: new Date(date).toISOString(),
@@ -313,11 +325,11 @@ const ListingApp = () => {
   };
 
   const generateShareableLink = () => {
-    if (selectedDateDetails) {
+    if (selectedDateModalDetails) {
       const url = new URL(window.location.href);
-      url.searchParams.set("date", selectedDateDetails.date);
-      url.searchParams.set("venue", selectedDateDetails.venue);
-      url.searchParams.set("time", selectedDateDetails.time);
+      url.searchParams.set("date", selectedDateModalDetails.date);
+      url.searchParams.set("venue", selectedDateModalDetails.venue);
+      url.searchParams.set("time", selectedDateModalDetails.time);
       navigator.clipboard.writeText(url.toString());
       alert("Shareable link copied to clipboard!");
     }
@@ -329,40 +341,18 @@ const ListingApp = () => {
     <div className="p-1">
       <div className="flex items-center justify-between bg-blue-200 text-gray py-4 px-6 mb-4 rounded-md shadow-md">
         <h1 className="text-xl font-semibold">Basketbo-Lista&trade;</h1>
-        <Button onClick={handleAddEvent} size="sm" className="text-sm bg-gray-500" title="Add Event (For Admin)">
-          <CalendarPlus className="w-4 h-4" />
-        </Button>
+        <div className="flex justify-end">
+          <Button onClick={handleListEvent} size="sm" className="text-sm bg-gray-500" title="List Events (For Admin)">
+            <List className="w-4 h-4" />
+          </Button>
+          <Button onClick={handleAddEvent} size="sm" className="text-sm bg-gray-500 ml-2" title="Add Event (For Admin)">
+            <CalendarPlus className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       <Card className="mb-4 text-sm">
-        <div className="flex items-center space-x-2 mb-6">
-          {dates.length > 0 ? (
-            <select
-              value={selectedDate}
-              onChange={(e) => {
-                const selected = dates.find((date) => date.id === e.target.value);
-                setSelectedDate(e.target.value);
-                setSelectedDateDetails(selected);
-                setIsOpenForRegistration(selected.isOpenForRegistration ?? false);
-              }}
-              className="p-2 border rounded text-md"
-            >
-              {dates.map((date) => (
-                <option key={date.id} value={date.id}>
-                  {new Date(date.date).toLocaleDateString("en-GB", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric"
-                  }).toUpperCase().replace(",", "")} / {date.venue.split(" ")[0]} / {date.time}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p>No available dates.</p>
-          )}
-          
-        </div>
-        {selectedDateDetails && isOpenForRegistration && (
+        {selectedDateDetails && (
           <div className="mt-2 mb-4">
             <p><strong>Venue:</strong> {selectedDateDetails.venue}</p>
             <p><strong>Max:</strong> {selectedDateDetails.max} players</p>
@@ -370,16 +360,6 @@ const ListingApp = () => {
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
         )}
-        {selectedDateDetails && (
-          <div className="flex items-center">
-            <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs" title="Share Link">
-              Share Link<Share className="ml-1 w-4 h-4" />
-            </Button>
-              <Button onClick={handleEditEvent} size="sm" className="flex items-center text-sm bg-orange-300 ml-2 text-xs" title="Edit Event">
-              Admin Edit<Pencil className="ml-1 w-4 h-4" />
-            </Button>
-          </div>
-          )}
       </Card>
 
       {showEventModal && (
@@ -387,15 +367,15 @@ const ListingApp = () => {
           <div className="bg-white p-6 rounded shadow-md max-w-sm w-full">
             <h2 className="text-lg mb-4">{isEditMode ? "Edit Event" : "Add New Event"}</h2>
             <form onSubmit={submitEvent} className="flex flex-col">
-              <Input type="date" name="date" className="mb-2" required defaultValue={isEditMode ? selectedDateDetails?.date?.split("T")[0] : ""} />
-              <Input placeholder="Venue" name="venue" className="mb-3" required defaultValue={isEditMode ? selectedDateDetails?.venue : ""} />
-              <Input placeholder="Max Players" name="maxPlayers" type="number" className="mb-3" required defaultValue={isEditMode ? selectedDateDetails?.max : ""} />
-              <Input placeholder="Pay To" name="payTo" className="mb-3" required defaultValue={isEditMode ? selectedDateDetails?.pay_to : ""} />
-              <Input placeholder="Time (e.g., 7-10 PM)" name="time" className="mb-5" required defaultValue={isEditMode ? selectedDateDetails?.time : ""} />
+              <Input type="date" name="date" className="mb-2" required defaultValue={isEditMode ? selectedDateModalDetails?.date?.split("T")[0] : ""} />
+              <Input placeholder="Venue" name="venue" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.venue : ""} />
+              <Input placeholder="Max Players" name="maxPlayers" type="number" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.max : ""} />
+              <Input placeholder="Pay To" name="payTo" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.pay_to : ""} />
+              <Input placeholder="Time (e.g., 7-10 PM)" name="time" className="mb-5" required defaultValue={isEditMode ? selectedDateModalDetails?.time : ""} />
               <Input
                 type="checkbox"
                 label="Registration Open"
-                defaultChecked={selectedDateDetails?.isOpenForRegistration}
+                defaultChecked={selectedDateModalDetails?.isOpenForRegistration}
                 name="isOpen"
                 className="mb-4"
               />
@@ -408,7 +388,53 @@ const ListingApp = () => {
         </div>
       )}
 
-      {selectedDate && isOpenForRegistration && (
+      {showListEventModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center text-sm">
+          <div className="bg-white p-6 rounded shadow-md max-w-sm w-full">
+            <h2 className="text-lg mb-4">Events Listing</h2>     
+            <div className="flex items-center space-x-2 mb-6">
+              {dates.length > 0 ? (
+                <select
+                  value={selectedDateModal}
+                  onChange={(e) => {
+                    const selected = dates.find((date) => date.id === e.target.value);
+                    setSelectedDateModal(e.target.value);
+                    setSelectedDateModalDetails(selected);
+                  }}
+                  className="p-2 border rounded text-md w-full"
+                >
+                  {dates.map((date) => (
+                    <option key={date.id} value={date.id}>
+                      {new Date(date.date).toLocaleDateString("en-GB", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric"
+                      }).toUpperCase().replace(",", "")} / {date.venue.split(" ")[0]} / {date.time}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p>No available dates.</p>
+              )}
+              
+            </div>
+            <div className="flex items-center text-xs">
+              <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs p" title="Share Link">
+                Copy Link<Share className="ml-1 w-4 h-4" />
+              </Button>
+                <Button onClick={handleEditEvent} size="sm" className="flex items-center text-sm bg-orange-300 ml-2 text-xs" title="Edit Event">
+                Edit<Pencil className="ml-1 w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Button type="button" className="bg-gray-400" onClick={() => setShowListEventModal(false)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedDate && isOpenForRegistration && !isPastDate(selectedDateDetails?.date) && (
         <Card className="mb-4 text-sm">
           <Input
             placeholder="Enter name here"
