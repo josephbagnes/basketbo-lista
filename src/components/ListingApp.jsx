@@ -245,6 +245,8 @@ const ListingApp = () => {
     }
   };
 
+  const isPastDate = (date) => new Date(date) < new Date();
+
   return (
     <div className="p-1">
       <div className="flex items-center justify-between bg-blue-200 text-gray py-4 px-6 mb-4 rounded-md shadow-md">
@@ -319,13 +321,13 @@ const ListingApp = () => {
       {selectedDate && (
         <Card className="mb-4 text-sm">
           <Input
-            placeholder="Enter name"
+            placeholder="Enter name here"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
-            className="mb-2"
+            className="mb-2 w-full"
           />
-          <Button onClick={handleRegister} size="md" className="text-md ml-2">Register</Button>
+          <Button onClick={handleRegister} size="md" className="text-md">Register</Button>
         </Card>
       )}
 
@@ -337,7 +339,7 @@ const ListingApp = () => {
               <div>
                 <span className="text-sm">{index + 1}. {reg.name}</span>
                 <span className="text-[10px] text-gray-500 ml-2 italic">
-                  {new Date(reg.timestamp).toLocaleString()}
+                  {new Date(reg.timestamp).toLocaleTimeString()}
                 </span>
               </div>
               <div className="flex items-center space-x-1">
@@ -348,7 +350,7 @@ const ListingApp = () => {
                   if (window.confirm(`Sure to cancel ${reg.name}'s registration?`)) {
                     handleCancel(reg.id);
                   }
-                }} size="sm" className="bg-red-400 text-xs py-1 mr-1" title="Cancel Registration">
+                }} size="sm" className="bg-red-400 text-xs py-1 mr-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="ml-1 w-4 h-4" />
                 </Button>
               </div>
@@ -362,14 +364,14 @@ const ListingApp = () => {
                   <div>
                   <span className="text-sm">{index + 1}. {reg.name}</span>
                     <span className="text-[10px] text-gray-500 ml-2 italic">
-                      {new Date(reg.timestamp).toLocaleString()}
+                      {new Date(reg.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
                   <Button onClick={() => {
                   if (window.confirm(`Sure to cancel ${reg.name}'s waitlist registration?`)) {
                     handleCancel(reg.id, true);
                   }
-                }} size="sm" className="bg-red-400 text-xs py-1" title="Cancel Registration">
+                }} size="sm" className="bg-red-400 text-xs py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="ml-1 w-4 h-4" /></Button>
                 </li>
               ))}
