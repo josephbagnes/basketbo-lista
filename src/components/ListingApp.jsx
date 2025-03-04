@@ -350,7 +350,8 @@ const ListingApp = () => {
       const text = `Date: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
         year: "numeric",
         month: "short",
-        day: "numeric"
+        day: "numeric",
+        weekday: "short",
       }).toUpperCase().replace(",", "") || ''}
 Venue: ${selectedDateDetails.venue || ''}
 Max: ${selectedDateDetails.max + ' players' || ''}
@@ -386,6 +387,12 @@ ${(waitlist || []).map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`;
       {selectedDateDetails && (
         <Card className="mb-4 text-sm">
           <div className="mt-2 mb-4">
+            <p><strong>Date:</strong> {new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        weekday: "short",
+      }).toUpperCase().replace(",", "")}</p>
             <p><strong>Venue:</strong> {selectedDateDetails.venue}</p>
             <p><strong>Max:</strong> {selectedDateDetails.max} players</p>
             <p><strong>Time:</strong> {selectedDateDetails.time}</p>
