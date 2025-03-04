@@ -367,11 +367,16 @@ const ListingApp = () => {
           <div className="bg-white p-6 rounded shadow-md max-w-sm w-full">
             <h2 className="text-lg mb-4">{isEditMode ? "Edit Event" : "Add New Event"}</h2>
             <form onSubmit={submitEvent} className="flex flex-col">
+              <label className="text-xs mb-1">Date</label>
               <Input type="date" name="date" className="mb-2" required defaultValue={isEditMode ? selectedDateModalDetails?.date?.split("T")[0] : ""} />
-              <Input placeholder="Venue" name="venue" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.venue : ""} />
-              <Input placeholder="Max Players" name="maxPlayers" type="number" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.max : ""} />
-              <Input placeholder="Pay To" name="payTo" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.pay_to : ""} />
-              <Input placeholder="Time (e.g., 7-10 PM)" name="time" className="mb-5" required defaultValue={isEditMode ? selectedDateModalDetails?.time : ""} />
+              <label className="text-xs mb-1">Venue</label>
+              <Input name="venue" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.venue : ""} />
+              <label className="text-xs mb-1">Max Players</label>
+              <Input name="maxPlayers" type="number" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.max : ""} />
+              <label className="text-xs mb-1">Pay To</label>
+              <Input name="payTo" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.pay_to : ""} />
+              <label className="text-xs mb-1">Time (e.g., 7-10 PM)</label>
+              <Input name="time" className="mb-5" required defaultValue={isEditMode ? selectedDateModalDetails?.time : ""} />
               <Input
                 type="checkbox"
                 label="Registration Open"
