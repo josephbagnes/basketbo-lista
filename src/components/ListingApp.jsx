@@ -12,7 +12,7 @@ import {
   deleteDoc,
   updateDoc,
   query,
-  orderBy
+  orderBy,
 } from "firebase/firestore";
 
 const ListingApp = () => {
@@ -82,24 +82,43 @@ const ListingApp = () => {
       alert("Name must be between 1 and 20 characters long.");
       return;
     }
-    if (registrations.some((reg) => reg.name.toLowerCase() === name.toLowerCase()) ||
-        waitlist.some((reg) => reg.name.toLowerCase() === name.toLowerCase())) {
-      alert("Name already exists!");
-      return;
-    }
+
     try {
       const docRef = doc(db, "dates", selectedDate);
+
+      // Re-fetch the latest registrations and waitlist from Firestore
+      const registrationsSnapshot = await getDocs(collection(docRef, "registrations"));
+      const fetchedRegistrations = registrationsSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      const waitlistSnapshot = await getDocs(collection(docRef, "waitlist"));
+      const fetchedWaitlist = waitlistSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setRegistrations(fetchedRegistrations);
+      setWaitlist(fetchedWaitlist);
+
+      if (fetchedRegistrations.some((reg) => reg.name.toLowerCase() === name.toLowerCase()) ||
+          fetchedWaitlist.some((reg) => reg.name.toLowerCase() === name.toLowerCase())) {
+        alert("Name already exists!");
+        return;
+      }
+
       const newRegistration = {
         name,
         timestamp: new Date().toISOString(),
       };
       let addedDocRef;
-      if (registrations.length < selectedDateDetails.max) {
+      if (fetchedRegistrations.length < selectedDateDetails.max) {
         addedDocRef = await addDoc(collection(docRef, "registrations"), newRegistration);
-        setRegistrations([...registrations, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+        setRegistrations([...fetchedRegistrations, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
       } else {
         addedDocRef = await addDoc(collection(docRef, "waitlist"), newRegistration);
-        setWaitlist([...waitlist, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+        setWaitlist([...fetchedWaitlist, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
       }
       setName("");
     } catch (error) {
