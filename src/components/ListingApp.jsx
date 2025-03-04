@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CalendarPlus, Share, Link, Trash } from "lucide-react";
+import { CalendarPlus, Share, Link, Trash, Pencil } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ const ListingApp = () => {
   const [waitlist, setWaitlist] = useState([]);
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
-
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -149,6 +149,20 @@ const ListingApp = () => {
     const adminsSnapshot = await getDocs(collection(db, "admins"));
     const validAdmin = adminsSnapshot.docs.find((doc) => doc.data().pin === pin);
     if (validAdmin) {
+      setIsEditMode(false);
+      setShowEventModal(true);
+    } else {
+      alert("Invalid Admin PIN!");
+    }
+  };
+
+  const handleEditEvent = async () => {
+    const pin = prompt("Enter Admin PIN:");
+    if (!pin) return;
+    const adminsSnapshot = await getDocs(collection(db, "admins"));
+    const validAdmin = adminsSnapshot.docs.find((doc) => doc.data().pin === pin);
+    if (validAdmin) {
+      setIsEditMode(true);
       setShowEventModal(true);
     } else {
       alert("Invalid Admin PIN!");
@@ -165,41 +179,55 @@ const ListingApp = () => {
     if (date && venue && maxPlayers && payTo && time) {
       try {
         const querySnapshot = await getDocs(collection(db, "dates"));
-        const existingEvents = querySnapshot.docs.map(doc => doc.data());
-        
-        // Check for duplicate date, venue, and time
-        const isDuplicate = existingEvents.some(event =>
-            event.date === new Date(date).toISOString() &&
-            event.venue === venue &&
-            event.time === time
-        );
+        const existingEvents = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const isDuplicate = existingEvents.some(event => {
+          const eventDate = new Date(event.date).toISOString().split("T")[0];
+          const inputDate = new Date(date).toISOString().split("T")[0];
+          return (
+              eventDate === inputDate &&
+              event.venue === venue &&
+              event.time === time &&
+              (!isEditMode || event.id !== selectedDate)
+          );
+        });
 
         if (isDuplicate) {
-            alert("An event with the same date, venue, and time already exists!");
-            return;
+          alert("An event with the same date, venue, and time already exists!");
+          return;
+        }
+
+        if (isEditMode) {
+          await updateDoc(doc(db, "dates", selectedDate), {
+            date: new Date(date).toISOString(),
+            venue: venue,
+            max: maxPlayers,
+            pay_to: payTo,
+            time: time
+          });
+          alert("Event updated successfully!");
+          setSelectedDateDetails({ id: selectedDate, date: new Date(date).toISOString(), venue: venue, max: maxPlayers, pay_to: payTo, time: time });
+        } else {
+          const newDateAdded = await addDoc(collection(db, "dates"), {
+            date: new Date(date).toISOString(),
+            venue: venue,
+            max: maxPlayers,
+            pay_to: payTo,
+            time: time
+          });
+          alert("Event added successfully!");
+          setSelectedDate(newDateAdded.id);
+          setSelectedDateDetails({ id: newDateAdded.id, date: new Date(date).toISOString(), venue: venue, max: maxPlayers, pay_to: payTo, time: time });
         }
         
-        await addDoc(collection(db, "dates"), {
-          date: new Date(date).toISOString(),
-          venue: venue,
-          max: maxPlayers,
-          pay_to: payTo,
-          time: time
-        });
-        alert("Event added successfully!");
         setShowEventModal(false);
         const fetchDates = async () => {
           const querySnapshot = await getDocs(query(collection(db, "dates"), orderBy("date", "desc")));
           const fetchedDates = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
           setDates(fetchedDates);
-          if (fetchedDates.length > 0) {
-            setSelectedDate(fetchedDates[0].id);
-            setSelectedDateDetails(fetchedDates[0]);
-          }
         };
         await fetchDates();
       } catch (error) {
-        console.error("Error adding event: ", error);
+        console.error("Error adding/updating event: ", error);
       }
     } else {
       alert("All fields are required!");
@@ -240,38 +268,45 @@ const ListingApp = () => {
                     year: "numeric",
                     month: "short",
                     day: "numeric"
-                  }).toUpperCase().replace(",", "")} / {date.venue} / {date.time}
+                  }).toUpperCase().replace(",", "")} / {date.venue.split(" ")[0]} / {date.time}
                 </option>
               ))}
             </select>
           ) : (
             <p>No available dates.</p>
           )}
-          {selectedDateDetails && (
-            <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs" title="Share Link">
-              <Share className="w-4 h-4" />
-            </Button>
-          )}
+          
         </div>
         {selectedDateDetails && (
-          <div className="mt-2">
-            <p><strong>Venue:</strong> {selectedDateDetails.venue} (Max: {selectedDateDetails.max} players)</p>
+          <div className="mt-2 mb-4">
+            <p><strong>Venue:</strong> {selectedDateDetails.venue}</p>
+            <p><strong>Max:</strong> {selectedDateDetails.max} players</p>
             <p><strong>Time:</strong> {selectedDateDetails.time}</p>
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
         )}
+        {selectedDateDetails && (
+          <div className="flex items-center">
+            <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs" title="Share Link">
+              Share Link<Share className="ml-1 w-4 h-4" />
+            </Button>
+              <Button onClick={handleEditEvent} size="sm" className="flex items-center text-sm bg-orange-300 ml-2 text-xs" title="Edit Event">
+              Admin Edit<Pencil className="ml-1 w-4 h-4" />
+            </Button>
+          </div>
+          )}
       </Card>
 
       {showEventModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center text-sm">
           <div className="bg-white p-6 rounded shadow-md max-w-sm w-full">
-            <h2 className="text-lg mb-4">Add New Event</h2>
+            <h2 className="text-lg mb-4">{isEditMode ? "Edit Event" : "Add New Event"}</h2>
             <form onSubmit={submitEvent} className="flex flex-col">
-              <Input type="date" name="date" className="mb-2" required />
-              <Input placeholder="Venue" name="venue" className="mb-3" required />
-              <Input placeholder="Max Players" name="maxPlayers" type="number" defaultValue={25} className="mb-3" required />
-              <Input placeholder="Pay To" name="payTo" className="mb-3" required />
-              <Input placeholder="Time (e.g., 7-10 PM)" name="time" className="mb-5" required />
+              <Input type="date" name="date" className="mb-2" required defaultValue={isEditMode ? selectedDateDetails?.date?.split("T")[0] : ""} />
+              <Input placeholder="Venue" name="venue" className="mb-3" required defaultValue={isEditMode ? selectedDateDetails?.venue : ""} />
+              <Input placeholder="Max Players" name="maxPlayers" type="number" className="mb-3" required defaultValue={isEditMode ? selectedDateDetails?.max : ""} />
+              <Input placeholder="Pay To" name="payTo" className="mb-3" required defaultValue={isEditMode ? selectedDateDetails?.pay_to : ""} />
+              <Input placeholder="Time (e.g., 7-10 PM)" name="time" className="mb-5" required defaultValue={isEditMode ? selectedDateDetails?.time : ""} />
               <div className="flex justify-end space-x-2">
                 <Button type="submit">Submit</Button>
                 <Button type="button" className="bg-gray-400" onClick={() => setShowEventModal(false)}>Cancel</Button>
@@ -302,7 +337,7 @@ const ListingApp = () => {
               <div>
                 <span className="text-sm">{index + 1}. {reg.name}</span>
                 <span className="text-[10px] text-gray-500 ml-2 italic">
-                  {new Date(reg.timestamp).toLocaleString("en-GB", { hour12: true, hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric', year: 'numeric' })}
+                  {new Date(reg.timestamp).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center space-x-1">
@@ -327,7 +362,7 @@ const ListingApp = () => {
                   <div>
                   <span className="text-sm">{index + 1}. {reg.name}</span>
                     <span className="text-[10px] text-gray-500 ml-2 italic">
-                      {new Date(reg.timestamp).toLocaleString("en-GB", { hour12: true, hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric', year: 'numeric' })}
+                      {new Date(reg.timestamp).toLocaleString()}
                     </span>
                   </div>
                   <Button onClick={() => {
