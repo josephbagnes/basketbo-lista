@@ -335,6 +335,16 @@ const ListingApp = () => {
     }
   };
 
+  const goToRegistrationsList = () => {
+    if (selectedDateModalDetails) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("date", selectedDateModalDetails.date);
+      url.searchParams.set("venue", selectedDateModalDetails.venue);
+      url.searchParams.set("time", selectedDateModalDetails.time);
+      window.location.href = url;
+    }
+  };
+
   const isPastDate = (date) => new Date(date) < new Date();
 
   return (
@@ -351,17 +361,17 @@ const ListingApp = () => {
         </div>
       </div>
 
-      <Card className="mb-4 text-sm">
-        {selectedDateDetails && (
+      {selectedDateDetails && (
+        <Card className="mb-4 text-sm">
           <div className="mt-2 mb-4">
             <p><strong>Venue:</strong> {selectedDateDetails.venue}</p>
             <p><strong>Max:</strong> {selectedDateDetails.max} players</p>
             <p><strong>Time:</strong> {selectedDateDetails.time}</p>
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
-        )}
-      </Card>
-
+        </Card>
+      )}
+      
       {showEventModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center text-sm">
           <div className="bg-white p-6 rounded shadow-md max-w-sm w-full">
@@ -427,12 +437,15 @@ const ListingApp = () => {
               <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs p" title="Share Link">
                 Copy Link<Share className="ml-1 w-4 h-4" />
               </Button>
-                <Button onClick={handleEditEvent} size="sm" className="flex items-center text-sm bg-orange-300 ml-2 text-xs" title="Edit Event">
+              <Button onClick={handleEditEvent} size="sm" className="flex items-center text-sm bg-orange-400 ml-2 text-xs" title="Edit Event">
                 Edit<Pencil className="ml-1 w-4 h-4" />
               </Button>
+              <Button onClick={goToRegistrationsList} size="sm" className="flex items-center text-sm bg-blue-400 ml-2 text-xs" title="View Registrations">
+                View<List className="ml-1 w-4 h-4" />
+              </Button>
             </div>
-
-            <div className="flex justify-end space-x-2">
+            <hr className="my-4"/>
+            <div className="flex justify-end space-x-2 mt-4">
               <Button type="button" className="bg-gray-400" onClick={() => setShowListEventModal(false)}>Close</Button>
             </div>
           </div>
@@ -499,7 +512,7 @@ const ListingApp = () => {
           )}
         </Card>
       )}
-      {!isOpenForRegistration && (
+      {selectedDateDetails && !isOpenForRegistration && (
         <Card className="mb-4 text-sm">
           <p className="italic">Not open for registration yet</p>
         </Card>
