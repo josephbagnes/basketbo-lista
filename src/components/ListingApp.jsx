@@ -487,7 +487,7 @@ ${(waitlist || []).map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`;
             className="mb-2 w-full"
           />
           <Input
-            placeholder="Enter registration PIN here"
+            placeholder="Set your own registration PIN here"
             value={regPin}
             onChange={(e) => setRegPin(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
