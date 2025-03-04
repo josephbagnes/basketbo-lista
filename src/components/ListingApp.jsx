@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { List, CalendarPlus, Share, Link, Trash, Pencil } from "lucide-react";
+import { List, CalendarPlus, Share, Link, Trash, Pencil, Copy } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -345,6 +345,28 @@ const ListingApp = () => {
     }
   };
 
+  const copyDetails = () => {
+    if (selectedDateDetails) {
+      const text = `Date: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "short",
+        day: "numeric"
+      }).toUpperCase().replace(",", "") || ''}
+Venue: ${selectedDateDetails.venue || ''}
+Max: ${selectedDateDetails.max || '' || ' players'}
+Time: ${selectedDateDetails.time || ''}
+Pay To: ${selectedDateDetails.pay_to || ''}
+
+Registrations:
+${(registrations || []).map((r, i) => `${i + 1}. ${r.name}`).join('\n')}
+
+Waitlist:
+${(waitlist || []).map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`;
+      navigator.clipboard.writeText(text.toString());
+      alert("Full details copied to clipboard!");
+    }
+  };
+
   const isPastDate = (date) => new Date(date) < new Date();
 
   return (
@@ -369,6 +391,9 @@ const ListingApp = () => {
             <p><strong>Time:</strong> {selectedDateDetails.time}</p>
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
+          <Button onClick={copyDetails} size="sm" className="flex items-center text-black text-sm bg-gray-200 text-xs" title="Copy Details">
+            Copy Details<Copy className="ml-1 w-4 h-4" />
+          </Button>
         </Card>
       )}
       
@@ -434,7 +459,7 @@ const ListingApp = () => {
               
             </div>
             <div className="flex items-center text-xs">
-              <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs p" title="Share Link">
+              <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs" title="Share Link">
                 Copy Link<Share className="ml-1 w-4 h-4" />
               </Button>
               <Button onClick={handleEditEvent} size="sm" className="flex items-center text-sm bg-orange-400 ml-2 text-xs" title="Edit Event">
