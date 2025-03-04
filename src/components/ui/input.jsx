@@ -22,6 +22,7 @@ export function Input({ className = "", type = "text", checked, label, ...props 
 
   return React.createElement("input", {
     className: `border p-2 rounded-2xl ${className}`,
+    type: type,
     ...props,
   });
 }
