@@ -13,6 +13,7 @@ import {
   updateDoc,
   query,
   orderBy,
+  setDoc,
 } from "firebase/firestore";
 
 const ListingApp = () => {
@@ -99,8 +100,8 @@ const ListingApp = () => {
         ...doc.data(),
       }));
 
-      setRegistrations(fetchedRegistrations);
-      setWaitlist(fetchedWaitlist);
+      setRegistrations(fetchedRegistrations.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+      setWaitlist(fetchedWaitlist.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
 
       if (fetchedRegistrations.some((reg) => reg.name.toLowerCase() === name.toLowerCase()) ||
           fetchedWaitlist.some((reg) => reg.name.toLowerCase() === name.toLowerCase())) {
@@ -138,10 +139,14 @@ const ListingApp = () => {
         setRegistrations(registrations.filter((reg) => reg.id !== id));
         if (waitlist.length > 0) {
           const earliestWaitlist = waitlist[0];
-          const waitlistRef = doc(db, "dates", selectedDate, "waitlist", earliestWaitlist.id);
-          await deleteDoc(waitlistRef);
-          await addDoc(collection(db, "dates", selectedDate, "registrations"), earliestWaitlist);
-          setRegistrations([...registrations.filter((reg) => reg.id !== id), earliestWaitlist].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+          await deleteDoc(doc(db, "dates", selectedDate, "waitlist", earliestWaitlist.id));
+          const newRegRef = doc(db, "dates", selectedDate, "registrations", earliestWaitlist.id);
+          await setDoc(newRegRef, earliestWaitlist);
+          setRegistrations((prev) => [
+              ...prev.filter((reg) => reg.id !== id),
+              { id: earliestWaitlist.id, ...earliestWaitlist },
+          ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+
           setWaitlist(waitlist.slice(1));
         }
       }
