@@ -12,10 +12,6 @@ Basketball event listing web application. A simple React application to manage e
 - Disables the "Cancel" button for past events.
 - Supports URL sharing with pre-selected event details.
 
-## Site
-
-Access the app here: https://basketbo-lista.web.app/
-
 ## Technologies Used
 
 - React
