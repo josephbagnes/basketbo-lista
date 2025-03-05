@@ -450,15 +450,15 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
 
       {selectedDate && isOpenForRegistration && !isPastDate(selectedDateDetails?.date) && (
         <Card className="mb-4 text-sm">
+          <label className="text-xs text-gray-500 italic">Name (1-20 chars)</label>
           <Input
-            placeholder="Enter name here"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
             className="mb-2 w-full"
           />
+          <label className="text-xs text-gray-500 italic">Set own PIN (4-10 chars) to protect your registration</label>
           <Input
-            placeholder="Set own PIN here to protect your registration"
             value={regPin}
             onChange={(e) => setRegPin(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
