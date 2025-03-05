@@ -25,7 +25,6 @@ const ListingApp = () => {
   const [selectedDateModal, setSelectedDateModal] = useState("");
   const [selectedDateModalDetails, setSelectedDateModalDetails] = useState(null);
   const [registrations, setRegistrations] = useState([]);
-  const [waitlist, setWaitlist] = useState([]);
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showListEventModal, setShowListEventModal] = useState(false);
@@ -68,11 +67,8 @@ const ListingApp = () => {
       const fetchRegistrations = async () => {
         const docRef = doc(db, "dates", selectedDate);
         const regSnap = await getDocs(collection(docRef, "registrations"));
-        const waitSnap = await getDocs(collection(docRef, "waitlist"));
         const regData = regSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((doc) => doc.id);
-        const waitData = waitSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((doc) => doc.id);
         setRegistrations(regData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-        setWaitlist(waitData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
         const dateDetails = dates.find((date) => date.id === selectedDate);
         setSelectedDateDetails(dateDetails);
       };
@@ -98,17 +94,9 @@ const ListingApp = () => {
         ...doc.data(),
       }));
 
-      const waitlistSnapshot = await getDocs(collection(docRef, "waitlist"));
-      const fetchedWaitlist = waitlistSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
       setRegistrations(fetchedRegistrations.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-      setWaitlist(fetchedWaitlist.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-
-      if (fetchedRegistrations.some((reg) => reg.name.toLowerCase() === name.toLowerCase()) ||
-          fetchedWaitlist.some((reg) => reg.name.toLowerCase() === name.toLowerCase())) {
+      
+      if (fetchedRegistrations.some((reg) => reg.name.toLowerCase() === name.toLowerCase())) {
         alert("Name already exists!");
         return;
       }
@@ -118,21 +106,17 @@ const ListingApp = () => {
         timestamp: new Date().toISOString(),
         pin: regPin,
       };
+
       let addedDocRef;
-      if (fetchedRegistrations.length < selectedDateDetails.max) {
-        addedDocRef = await addDoc(collection(docRef, "registrations"), newRegistration);
-        setRegistrations([...fetchedRegistrations, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-      } else {
-        addedDocRef = await addDoc(collection(docRef, "waitlist"), newRegistration);
-        setWaitlist([...fetchedWaitlist, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-      }
+      addedDocRef = await addDoc(collection(docRef, "registrations"), newRegistration);
+      setRegistrations([...fetchedRegistrations, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
       setName("");
     } catch (error) {
       console.error("Error registering: ", error);
     }
   };
 
-  const handleCancel = async (id, isWaitlist = false) => {
+  const handleCancel = async (id) => { 
     try {
       const pin = prompt("Enter Registration PIN or Admin PIN to cancel:");
       if (!pin) return;
@@ -140,8 +124,7 @@ const ListingApp = () => {
       const adminsSnapshot = await getDocs(collection(db, "admins"));
       const isAdmin = adminsSnapshot.docs.some((doc) => doc.data().pin === pin);
 
-      const collectionName = isWaitlist ? "waitlist" : "registrations";
-      const docRef = doc(db, "dates", selectedDate, collectionName, id);
+      const docRef = doc(db, "dates", selectedDate, "registrations", id);
       const registrationDoc = await getDoc(docRef);
 
       if (!isAdmin && !registrationDoc.data().pin) {
@@ -157,24 +140,7 @@ const ListingApp = () => {
       }
 
       await deleteDoc(docRef);
-
-      if (isWaitlist) {
-        setWaitlist(waitlist.filter((reg) => reg.id !== id));
-      } else {
-        setRegistrations(registrations.filter((reg) => reg.id !== id));
-        if (waitlist.length > 0) {
-          const earliestWaitlist = waitlist[0];
-          await deleteDoc(doc(db, "dates", selectedDate, "waitlist", earliestWaitlist.id));
-          const newRegRef = doc(db, "dates", selectedDate, "registrations", earliestWaitlist.id);
-          await setDoc(newRegRef, earliestWaitlist);
-          setRegistrations((prev) => [
-              ...prev.filter((reg) => reg.id !== id),
-              { id: earliestWaitlist.id, ...earliestWaitlist },
-          ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-
-          setWaitlist(waitlist.slice(1));
-        }
-      }
+      setRegistrations(registrations.filter((reg) => reg.id !== id));
     } catch (error) {
       console.error("Error cancelling registration: ", error);
     }
@@ -357,10 +323,10 @@ Time: ${selectedDateDetails.time || ''}
 Pay To: ${selectedDateDetails.pay_to || ''}
 
 Registrations:
-${(registrations || []).map((r, i) => `${i + 1}. ${r.name}`).join('\n')}
+${(registrations || []).slice(0, selectedDateDetails.max).map((r, i) => `${i + 1}. ${r.name} ${r.paid ? ' - Paid' : ''}`).join('\n')}
 
 Waitlist:
-${(waitlist || []).map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`;
+${(registrations || []).slice(selectedDateDetails.max, registrations.length).map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`;
       navigator.clipboard.writeText(text.toString());
       alert("Full details copied to clipboard!");
     }
@@ -502,10 +468,10 @@ ${(waitlist || []).map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`;
         </Card>
       )}
 
-      {isOpenForRegistration && (registrations.length > 0 || waitlist.length > 0) && (
+      {isOpenForRegistration && registrations.length > 0 && (
         <Card className="mb-4">
           <h2 className="text-md font-semibold my-3">Registrations</h2>
-          {registrations.map((reg, index) => (
+          {registrations.slice(0, selectedDateDetails.max).map((reg, index) => (
             <li key={`reg-${reg.id}`} className="flex justify-between items-center mb-1">
               <div>
                 <span className="text-sm">{index + 1}. {reg.name}</span>
@@ -523,18 +489,18 @@ ${(waitlist || []).map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`;
               </div>
             </li>
           ))}
-          {waitlist.length > 0 && (
+          {registrations.length > selectedDateDetails.max && (
             <>
               <h3 className="text-md font-semibold mt-4 mb-2">Waitlist</h3>
-              {waitlist.map((reg, index) => (
+              {registrations.slice(selectedDateDetails.max, registrations.length).map((reg, index) => (
                 <li key={`wait-${reg.id}`} className="flex justify-between items-center mb-1">
                   <div>
                   <span className="text-sm">{index + 1}. {reg.name}</span>
-                    <span className="text-[10px] text-gray-500 ml-2 italic">
-                      {new Date(reg.timestamp).toLocaleTimeString()}
-                    </span>
+                  <span className="text-[10px] text-gray-500 ml-2 italic">
+                    {new Date(reg.timestamp).toLocaleTimeString()}
+                  </span>
                   </div>
-                  <Button onClick={() => handleCancel(reg.id, true)} size="sm" className="bg-red-400 text-xs py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
+                  <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-400 text-xs py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="ml-1 w-4 h-4" /></Button>
                 </li>
               ))}
