@@ -81,14 +81,12 @@ const ListingApp = () => {
   }, [selectedDate, dates]);
 
   const handleRegister = async () => {
-    if (!name) return;
-    if (name.length < 1 || name.length > 20) {
-      alert("Name must be 1-20 characters long");
+    if (!name || name.length < 1 || name.length > 20) {
+      alert("Name is required and must be 1-20 chars");
       return;
     }
-    if (!regPin) return;
-    if (regPin.length < 4 || regPin.length > 10) {
-      alert("PIN must be 4-10 characters long");
+    if (!regPin || regPin.length < 4 || regPin.length > 10) {
+      alert("PIN is required and must be 4-10 chars");
       return;
     }
 
@@ -494,7 +492,7 @@ ${(waitlist || []).map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`;
             className="mb-2 w-full"
           />
           <Input
-            placeholder="Set your own registration PIN here"
+            placeholder="Set own PIN here to protect your registration"
             value={regPin}
             onChange={(e) => setRegPin(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
