@@ -311,7 +311,9 @@ const ListingApp = () => {
 
   const copyDetails = () => {
     if (selectedDateDetails) {
-      const text = `Date: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
+      const text = `Link: ${window.location.href}
+      
+Date: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
         year: "numeric",
         month: "short",
         day: "numeric",
