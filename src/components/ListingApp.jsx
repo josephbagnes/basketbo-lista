@@ -16,6 +16,7 @@ import {
   orderBy,
   setDoc,
 } from "firebase/firestore";
+import blIcon from "@/assets/blIcon.png";
 
 const ListingApp = () => {
   const [name, setName] = useState("");
@@ -339,7 +340,10 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
   return (
     <div className="p-1">
       <div className="flex items-center justify-between bg-blue-200 text-gray py-4 px-6 mb-4 rounded-md shadow-md">
-        <h1 className="text-xl font-semibold">Basketbo-Lista&trade;</h1>
+        <div className="flex justify-start">
+          <img src={blIcon} className="w-7 mr-2" />
+          <h1 className="text-xl font-semibold">basketbo-lista</h1>
+        </div>
         <div className="flex justify-end">
           <Button onClick={handleListEvent} size="sm" className="text-sm bg-gray-500" title="List Events (For Admin)">
             <List className="w-4 h-4" />
