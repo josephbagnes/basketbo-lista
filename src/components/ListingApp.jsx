@@ -102,10 +102,13 @@ const ListingApp = () => {
                         hour12: true}).toUpperCase() + ' - ' + new Date(`1970-01-01T${selectedDateDetails.endTime}:00`).toLocaleTimeString("en-GB", {
                         hour: "numeric",
                         minute: "2-digit",
-                        hour12: true}).toUpperCase() || ''}<br><b>Venue</b>: ${selectedDateDetails.venue || ''}<br><br><b>Name</b>: ${regData.name || ''}<br><b>PIN</b>: ${regData.pin || ''}`
+                        hour12: true}).toUpperCase() || ''}<br><b>Venue</b>: ${selectedDateDetails.venue || ''}<br><br><b>Name</b>: ${regData.name || ''}`
         }
       }
 
+      if(!isCancellation){
+        regEmailDoc.message.html += `<br><b>PIN</b>: ${regData.pin || ''}`;
+      }
       if(isCancellation){
         const adminsSnapshot = await getDocs(collection(db, "admins"));
         const adminEmails = adminsSnapshot.docs
