@@ -21,6 +21,7 @@ import blIcon from "@/assets/blIcon.png";
 const ListingApp = () => {
   const [name, setName] = useState("");
   const [regPin, setRegPin] = useState("");
+  const [regEmail, setRegEmail] = useState("");
   const [dates, setDates] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedDateModal, setSelectedDateModal] = useState("");
@@ -36,14 +37,16 @@ const ListingApp = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const date = urlParams.get("date");
     const venue = urlParams.get("venue");
-    const time = urlParams.get("time");
+    const startTime = urlParams.get("startTime");
+    const endTime = urlParams.get("endTime");
 
-    if (date && venue && time) {
+    if (date && venue && startTime && endTime) {
       const matchedEvent = dates.find(
         (event) =>
           event.date === date &&
           event.venue === venue &&
-          event.time === time
+          event.startTime === startTime &&
+          event.endTime === endTime
       );
       if (matchedEvent) {
         setSelectedDate(matchedEvent.id);
@@ -51,6 +54,10 @@ const ListingApp = () => {
         setIsOpenForRegistration(matchedEvent.isOpenForRegistration ?? false);
       }
     }
+
+    setName(localStorage.getItem("myRegName") || "");
+    setRegPin(localStorage.getItem("myRegPin") || "");
+    setRegEmail(localStorage.getItem("myRegEmail") || "");
   }, [dates]);
 
   useEffect(() => {
@@ -77,14 +84,58 @@ const ListingApp = () => {
     }
   }, [selectedDate, dates]);
 
+  const sendEmail = async (subjectSuffix, regData, isCancellation) => {
+    try{
+      const toEmail = regData.email ? regData.email : 'noemail@gmail.com'
+      const regEmailDoc = {
+        to: toEmail,
+        message: {
+          subject: `[basketbo-lista] ${subjectSuffix}`,
+          html: `<b>Date</b>: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                        weekday: "short",
+                      }).toUpperCase().replace(",", "") || ''}<br><b>Time</b>: ${new Date(`1970-01-01T${selectedDateDetails.startTime}:00`).toLocaleTimeString("en-GB", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true}).toUpperCase() + ' - ' + new Date(`1970-01-01T${selectedDateDetails.endTime}:00`).toLocaleTimeString("en-GB", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true}).toUpperCase() || ''}<br><b>Venue</b>: ${selectedDateDetails.venue || ''}<br><br><b>Name</b>: ${regData.name || ''}<br><b>PIN</b>: ${regData.pin || ''}`
+        }
+      }
+
+      if(isCancellation){
+        const adminsSnapshot = await getDocs(collection(db, "admins"));
+        const adminEmails = adminsSnapshot.docs
+                          .map(doc => doc.data().email)
+                          .filter(email => email);
+        regEmailDoc.bcc = adminEmails;
+      }
+      addDoc(collection(db, "mail"), regEmailDoc);
+    }catch (error) {
+      console.error("Error saving email: ", error);
+    }
+  };
+
   const handleRegister = async () => {
     if (!name || name.length < 1 || name.length > 20) {
       alert("Name is required and must be 1-20 chars");
       return;
     }
+    localStorage.setItem("myRegName", name);
     if (!regPin || regPin.length < 4 || regPin.length > 10) {
       alert("PIN is required and must be 4-10 chars");
       return;
+    }
+    localStorage.setItem("myRegPin", regPin);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (regEmail && !emailRegex.test(regEmail)){
+      alert("Email format is invalid");
+      return;
+    } else if(regEmail){
+      localStorage.setItem("myRegEmail", regEmail);
     }
 
     try {
@@ -106,12 +157,18 @@ const ListingApp = () => {
         name,
         timestamp: new Date().toISOString(),
         pin: regPin,
+        email: regEmail,
       };
 
       let addedDocRef;
       addedDocRef = await addDoc(collection(docRef, "registrations"), newRegistration);
       setRegistrations([...fetchedRegistrations, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-      setName("");
+      alert("Registered successfuly!");
+
+      if(regEmail){
+        sendEmail('Registration Completed', newRegistration, false);
+      }
+
     } catch (error) {
       console.error("Error registering: ", error);
     }
@@ -139,6 +196,8 @@ const ListingApp = () => {
         alert("Invalid PIN!");
         return;
       }
+
+      sendEmail('Cancellation', registrationDoc.data(), true);
 
       await deleteDoc(docRef);
       setRegistrations(registrations.filter((reg) => reg.id !== id));
@@ -226,9 +285,10 @@ const ListingApp = () => {
     const venue = event.target.venue.value;
     const maxPlayers = parseInt(event.target.maxPlayers.value, 10);
     const payTo = event.target.payTo.value;
-    const time = event.target.time.value;
+    const startTime = event.target.startTime.value;
+    const endTime = event.target.endTime.value;
     const isOpen = event.target.isOpen.checked;
-    if (date && venue && maxPlayers && payTo && time) {
+    if (date && venue && maxPlayers && payTo && startTime && endTime) {
       try {
         const querySnapshot = await getDocs(collection(db, "dates"));
         const existingEvents = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -238,7 +298,8 @@ const ListingApp = () => {
           return (
               eventDate === inputDate &&
               event.venue === venue &&
-              event.time === time &&
+              event.startTime === startTime &&
+              event.endTime === endTime &&
               (!isEditMode || event.id !== selectedDateModal)
           );
         });
@@ -248,29 +309,27 @@ const ListingApp = () => {
           return;
         }
 
+        const eventDetails = {
+          date: new Date(date).toISOString().split("T")[0],
+          venue: venue,
+          max: maxPlayers,
+          pay_to: payTo,
+          startTime: startTime,
+          endTime: endTime,
+          isOpenForRegistration: isOpen,
+        }
+
         if (isEditMode) {
-          await updateDoc(doc(db, "dates", selectedDateModal), {
-            date: new Date(date).toISOString(),
-            venue: venue,
-            max: maxPlayers,
-            pay_to: payTo,
-            time: time,
-            isOpenForRegistration: isOpen,
-          });
+          await updateDoc(doc(db, "dates", selectedDateModal), eventDetails);
           alert("Event updated successfully!");
-          setSelectedDateDetails({ id: selectedDateModal, date: new Date(date).toISOString(), venue: venue, max: maxPlayers, pay_to: payTo, time: time, isOpenForRegistration: isOpenForRegistration });
+          eventDetails.id = selectedDateModal;
+          setSelectedDateDetails(eventDetails);
         } else {
-          const newDateAdded = await addDoc(collection(db, "dates"), {
-            date: new Date(date).toISOString(),
-            venue: venue,
-            max: maxPlayers,
-            pay_to: payTo,
-            time: time,
-            isOpenForRegistration: isOpen,
-          });
+          const newDateAdded = await addDoc(collection(db, "dates"), eventDetails);
           alert("Event added successfully!");
           setSelectedDate(newDateAdded.id);
-          setSelectedDateDetails({ id: newDateAdded.id, date: new Date(date).toISOString(), venue: venue, max: maxPlayers, pay_to: payTo, time: time, isOpenForRegistration: isOpenForRegistration });
+          eventDetails.id = newDateAdded.id;
+          setSelectedDateDetails(eventDetails);
         }
         
         setIsOpenForRegistration(isOpen);
@@ -294,7 +353,8 @@ const ListingApp = () => {
       const url = new URL(window.location.href);
       url.searchParams.set("date", selectedDateModalDetails.date);
       url.searchParams.set("venue", selectedDateModalDetails.venue);
-      url.searchParams.set("time", selectedDateModalDetails.time);
+      url.searchParams.set("startTime", selectedDateModalDetails.startTime);
+      url.searchParams.set("endTime", selectedDateModalDetails.endTime);
       navigator.clipboard.writeText(url.toString());
       alert("Shareable link copied to clipboard!");
     }
@@ -305,7 +365,8 @@ const ListingApp = () => {
       const url = new URL(window.location.href);
       url.searchParams.set("date", selectedDateModalDetails.date);
       url.searchParams.set("venue", selectedDateModalDetails.venue);
-      url.searchParams.set("time", selectedDateModalDetails.time);
+      url.searchParams.set("startTime", selectedDateModalDetails.startTime);
+      url.searchParams.set("endTime", selectedDateModalDetails.endTime);
       window.location.href = url;
     }
   };
@@ -322,7 +383,13 @@ Date: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
       }).toUpperCase().replace(",", "") || ''}
 Venue: ${selectedDateDetails.venue || ''}
 Max: ${selectedDateDetails.max + ' players' || ''}
-Time: ${selectedDateDetails.time || ''}
+Time: ${new Date(`1970-01-01T${selectedDateDetails.startTime}:00`).toLocaleTimeString("en-GB", {
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true}).toUpperCase() + ' - ' + new Date(`1970-01-01T${selectedDateDetails.endTime}:00`).toLocaleTimeString("en-GB", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true}).toUpperCase() || ''}
 Pay To: ${selectedDateDetails.pay_to || ''}
 
 Registrations:
@@ -365,7 +432,13 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
       }).toUpperCase().replace(",", "")}</p>
             <p><strong>Venue:</strong> {selectedDateDetails.venue}</p>
             <p><strong>Max:</strong> {selectedDateDetails.max} players</p>
-            <p><strong>Time:</strong> {selectedDateDetails.time}</p>
+            <p><strong>Time:</strong> {new Date(`1970-01-01T${selectedDateDetails.startTime}:00`).toLocaleTimeString("en-GB", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true}).toUpperCase()} - {new Date(`1970-01-01T${selectedDateDetails.endTime}:00`).toLocaleTimeString("en-GB", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true}).toUpperCase()}</p>
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
           <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-gray-400 text-xs" title="Copy Details">
@@ -387,8 +460,12 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
               <Input name="maxPlayers" type="number" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.max : ""} />
               <label className="text-xs mb-1">Pay To</label>
               <Input name="payTo" className="mb-3" required defaultValue={isEditMode ? selectedDateModalDetails?.pay_to : ""} />
-              <label className="text-xs mb-1">Time (e.g., 7-10 PM)</label>
-              <Input name="time" className="mb-5" required defaultValue={isEditMode ? selectedDateModalDetails?.time : ""} />
+              {/* <label className="text-xs mb-1">Time (e.g., 7-10 PM)</label>
+              <Input name="time" className="mb-5" required defaultValue={isEditMode ? selectedDateModalDetails?.time : ""} /> */}
+              <label className="text-xs mb-1">Start Time</label>
+              <Input type="time" name="startTime" className="mb-2" required defaultValue={isEditMode ? selectedDateModalDetails?.startTime?.split("T")[0] : ""} />
+              <label className="text-xs mb-1">End Time</label>
+              <Input type="time" name="endTime" className="mb-2" required defaultValue={isEditMode ? selectedDateModalDetails?.endTime?.split("T")[0] : ""} />
               <Input
                 type="checkbox"
                 label="Registration Open"
@@ -426,7 +503,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                         year: "numeric",
                         month: "short",
                         day: "numeric"
-                      }).toUpperCase().replace(",", "")} / {date.venue.split(" ")[0]} / {date.time}
+                      }).toUpperCase().replace(",", "")} / {date.venue.split(" ")[0]}
                     </option>
                   ))}
                 </select>
@@ -456,17 +533,24 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
 
       {selectedDate && isOpenForRegistration && !isPastDate(selectedDateDetails?.date) && (
         <Card className="mb-4 text-sm">
-          <label className="text-xs text-gray-500 italic">Name (1-20 chars)</label>
+          <label className="text-xs text-gray-500 italic">* Name (1-20 chars)</label>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
             className="mb-2 w-full"
           />
-          <label className="text-xs text-gray-500 italic">Set own PIN (4-10 chars) to protect your registration</label>
+          <label className="text-xs text-gray-500 italic">* Set own PIN (4-10 chars) to protect your registration</label>
           <Input
             value={regPin}
             onChange={(e) => setRegPin(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
+            className="mb-2 w-full"
+          />
+          <label className="text-xs text-gray-500 italic">Set email for notifications (optional)</label>
+          <Input
+            value={regEmail}
+            onChange={(e) => setRegEmail(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
             className="mb-2 w-full"
           />
