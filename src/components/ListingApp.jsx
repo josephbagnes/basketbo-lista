@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { List, CalendarPlus, Share, Link, Trash, Pencil, Copy, Info } from "lucide-react";
+import { List, CalendarPlus, Share, Link, Trash, Pencil, Copy, CalendarArrowDown } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -121,6 +121,34 @@ const ListingApp = () => {
     }catch (error) {
       console.error("Error saving email: ", error);
     }
+  };
+
+  const downloadIcs = async () => {
+    const formatDateTime = (date, time) => {
+      return new Date(`${date}T${time}:00`).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    };
+    const startDateTime = formatDateTime(selectedDateDetails.date, selectedDateDetails.startTime);
+    const endDateTime = formatDateTime(selectedDateDetails.date, selectedDateDetails.endTime);
+    const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//basketbo-lista.com//Game Schedule//EN
+BEGIN:VEVENT
+UID:${new Date().getTime()}@basketbo-lista.com
+DTSTAMP:${startDateTime}
+DTSTART:${startDateTime}
+DTEND:${endDateTime}
+SUMMARY:${selectedDateDetails.venue}
+END:VEVENT
+END:VCALENDAR`;
+    
+    const blob = new Blob([icsContent], { type: "text/calendar" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `event-${selectedDate}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const handleRegister = async () => {
@@ -460,9 +488,14 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             hour12: true}).toUpperCase()}</p>
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
-          <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-gray-400 text-xs p-2" title="Copy Details">
-            Copy Details<Copy className="ml-1 w-4 h-4" />
-          </Button>
+          <div className="flex">
+            <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-gray-400 text-xs p-2" title="Copy Details">
+              <Copy className="ml-1 w-4 h-4" />
+            </Button>
+            <Button onClick={downloadIcs} size="sm" className="flex items-center text-sm bg-gray-400 text-xs p-2 ml-2" title="Download Calendar">
+              <CalendarArrowDown className="ml-1 w-4 h-4" />
+            </Button>
+          </div>
         </Card>
       )}
       
@@ -595,7 +628,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                 <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs px-2 py-1 w-20">
                   {reg.paid ? "Paid" : "Unpaid"}
                 </Button>
-                <Button onClick={() => handleCancel(reg.id)} size="sm" title="Cancel Registration" className="bg-red-400 text-xs px-2 py-1 mr-1" disabled={isPastDate(selectedDateDetails?.date)}>
+                <Button onClick={() => handleCancel(reg.id)} size="sm" title="Cancel Registration" className="bg-orange-400 text-xs px-2 py-1 mr-1" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="ml-1 w-4 h-4" />
                 </Button>
               </div>
@@ -617,7 +650,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                       hour12: true
                     }))}>{index + 1}. {reg.name}</span>
                   </div>
-                  <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-400 text-xs px-2 py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
+                  <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-orange-300 text-xs px-2 py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="ml-1 w-4 h-4" /></Button>
                 </li>
               ))}
