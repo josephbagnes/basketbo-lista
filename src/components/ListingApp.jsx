@@ -459,10 +459,10 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
           <h1 className="text-xl font-semibold">basketbo-lista</h1>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleListEvent} size="sm" className="text-sm bg-gray-500 p-2" title="List Events (For Admin)">
-            <List className="w-4 h-4" />
+          <Button onClick={handleListEvent} size="sm" className="text-sm bg-gray-500 p-2 rounded-full" title="List Events (For Admin)">
+            <List className="w-4 h-4 text-white-500" />
           </Button>
-          <Button onClick={handleAddEvent} size="sm" className="text-sm bg-gray-500 p-2 ml-2" title="Add Event (For Admin)">
+          <Button onClick={handleAddEvent} size="sm" className="text-sm bg-gray-500 p-2 rounded-full ml-2" title="Add Event (For Admin)">
             <CalendarPlus className="w-4 h-4" />
           </Button>
         </div>
@@ -489,11 +489,11 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
           <div className="flex">
-            <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-gray-400 text-xs p-2" title="Copy Details">
-              <Copy className="ml-1 w-4 h-4" />
+            <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-white text-xs p-2 rounded-full" title="Copy Details">
+              <Copy className="w-6 h-6 text-blue-500" />
             </Button>
-            <Button onClick={downloadIcs} size="sm" className="flex items-center text-sm bg-gray-400 text-xs p-2 ml-2" title="Download Calendar">
-              <CalendarArrowDown className="ml-1 w-4 h-4" />
+            <Button onClick={downloadIcs} size="sm" className="flex items-center text-sm bg-white text-xs p-2 rounded-full ml-2" title="Download Calendar">
+              <CalendarArrowDown className="w-6 h-6 text-blue-500" />
             </Button>
           </div>
         </Card>
@@ -604,7 +604,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             onChange={(e) => setRegEmail(e.target.value)}
             className="mb-2 w-full"
           />
-          <Button onClick={handleRegister} size="md" className="text-md p-2" disabled={isSubmitting}>{isSubmitting ? "Registering..." : "Register"}</Button>
+          <Button onClick={handleRegister} size="md" className="text-md p-2 mt-2" disabled={isSubmitting}>{isSubmitting ? "Registering..." : "Register"}</Button>
         </Card>
       )}
 
@@ -628,15 +628,15 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                 <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs px-2 py-1 w-20">
                   {reg.paid ? "Paid" : "Unpaid"}
                 </Button>
-                <Button onClick={() => handleCancel(reg.id)} size="sm" title="Cancel Registration" className="bg-orange-400 text-xs px-2 py-1 mr-1" disabled={isPastDate(selectedDateDetails?.date)}>
-                  <Trash className="ml-1 w-4 h-4" />
+                <Button onClick={() => handleCancel(reg.id)} size="xs" title="Cancel Registration" className="bg-white text-xs p-1 rounded-full" disabled={isPastDate(selectedDateDetails?.date)}>
+                  <Trash className="w-4 h-4 text-red-500" />
                 </Button>
               </div>
             </li>
           ))}
           {registrations.length > selectedDateDetails.max && (
             <>
-              <h3 className="text-md font-semibold mt-4 mb-2">Waitlist</h3>
+              <h3 className="text-md font-semibold mt-6 mb-2">Waitlist</h3>
               {registrations.slice(selectedDateDetails.max, registrations.length).map((reg, index) => (
                 <li key={`wait-${reg.id}`} className="flex justify-between items-center mb-1">
                   <div className="flex items-center space-x-1">
@@ -650,8 +650,9 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                       hour12: true
                     }))}>{index + 1}. {reg.name}</span>
                   </div>
-                  <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-orange-300 text-xs px-2 py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
-                  <Trash className="ml-1 w-4 h-4" /></Button>
+                  <Button onClick={() => handleCancel(reg.id)} size="xs" className="bg-white text-xs p-1 rounded-full" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
+                    <Trash className="w-4 h-4 text-red-500" />
+                  </Button>
                 </li>
               ))}
             </>
