@@ -10,7 +10,7 @@ export function Input({ className = "", type = "text", checked, label, ...props 
         "label", 
         { className: "inline-flex items-center" },
         React.createElement("input", {
-          className: "border p-2 rounded-2xl mr-2",
+          className: "border p-2 rounded-2xl mr-2 ",
           type: "checkbox",
           checked: checked,
           ...props

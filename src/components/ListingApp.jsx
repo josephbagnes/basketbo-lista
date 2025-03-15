@@ -200,6 +200,10 @@ const ListingApp = () => {
         return;
       }
 
+      if(isAdmin){
+        localStorage.setItem("myAdminPin", pin);
+      }
+
       sendEmail('Cancellation', registrationDoc.data(), true);
 
       await deleteDoc(docRef);
@@ -232,6 +236,10 @@ const ListingApp = () => {
         return;
       }
 
+      if(isAdmin){
+        localStorage.setItem("myAdminPin", pin);
+      }
+
       await updateDoc(docRef, { paid: !isPaid });
       setRegistrations(registrations.map((reg) =>
         reg.id === id ? { ...reg, paid: !isPaid } : reg
@@ -242,20 +250,21 @@ const ListingApp = () => {
   };
 
   const handleAddEvent = async () => {
-    const pin = prompt("Enter Admin PIN:");
+    const pin = prompt("Enter Admin PIN:", localStorage.getItem("myAdminPin") || '');
     if (!pin) return;
     const adminsSnapshot = await getDocs(collection(db, "admins"));
     const validAdmin = adminsSnapshot.docs.find((doc) => doc.data().pin === pin);
     if (validAdmin) {
       setIsEditMode(false);
       setShowEventModal(true);
+      localStorage.setItem("myAdminPin", pin);
     } else {
       alert("Invalid Admin PIN!");
     }
   };
 
   const handleListEvent = async () => {
-    const pin = prompt("Enter Admin PIN:");
+    const pin = prompt("Enter Admin PIN:", localStorage.getItem("myAdminPin") || '');
     if (!pin) return;
     const adminsSnapshot = await getDocs(collection(db, "admins"));
     const validAdmin = adminsSnapshot.docs.find((doc) => doc.data().pin === pin);
@@ -271,6 +280,7 @@ const ListingApp = () => {
       };
       fetchDates();
       setShowListEventModal(true);
+      localStorage.setItem("myAdminPin", pin);
     } else {
       alert("Invalid Admin PIN!");
     }

@@ -8,11 +8,14 @@ body {
     padding: 0;
     box-sizing: border-box;
     font-family: Arial, sans-serif;
-    background-color: #000000ea !important;
+    background-color: #101010ea !important;
     filter: invert(100%) hue-rotate(180deg);
 }
 
 #root {
-    padding: 20px;
+    padding: 10px;
 }
-  
+
+input {
+    border: 0.5px solid #535353a0;
+}
