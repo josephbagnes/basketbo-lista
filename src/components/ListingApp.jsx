@@ -32,6 +32,7 @@ const ListingApp = () => {
   const [showListEventModal, setShowListEventModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isOpenForRegistration, setIsOpenForRegistration] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -123,6 +124,9 @@ const ListingApp = () => {
   };
 
   const handleRegister = async () => {
+
+    if(isSubmitting) return;
+
     if (!name || name.length < 1 || name.length > 20) {
       alert("Name is required and must be 1-20 chars");
       return;
@@ -163,6 +167,8 @@ const ListingApp = () => {
         email: regEmail,
       };
 
+      setIsSubmitting(true);
+
       let addedDocRef;
       addedDocRef = await addDoc(collection(docRef, "registrations"), newRegistration);
       setRegistrations([...fetchedRegistrations, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
@@ -171,7 +177,7 @@ const ListingApp = () => {
       if(regEmail){
         sendEmail('Registration Completed', newRegistration, false);
       }
-
+      setTimeout(() => setIsSubmitting(false), 1000);
     } catch (error) {
       console.error("Error registering: ", error);
     }
@@ -461,7 +467,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
       )}
       
       {showEventModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center text-sm">
+        <div className="fixed inset-0 bg-gray bg-opacity-50 flex items-center justify-center text-sm">
           <div className="bg-white p-6 rounded shadow-md max-w-sm w-full">
             <h2 className="text-lg mb-4">{isEditMode ? "Edit Event" : "Add New Event"}</h2>
             <form onSubmit={submitEvent} className="flex flex-col">
@@ -496,7 +502,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
       )}
 
       {showListEventModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center text-sm">
+        <div className="fixed inset-0 bg-gray bg-opacity-50 flex items-center justify-center text-sm">
           <div className="bg-white p-6 rounded shadow-md max-w-sm w-full">
             <h2 className="text-lg mb-4">Events Listing</h2>     
             <div className="flex items-center space-x-2 mb-6">
@@ -550,7 +556,6 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
             className="mb-2 w-full"
           />
           <label className="text-xs text-gray-500 italic">* Set own PIN (4-10 chars) to protect your registration</label>
@@ -558,17 +563,15 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             type="password"
             value={regPin}
             onChange={(e) => setRegPin(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
             className="mb-2 w-full"
           />
           <label className="text-xs text-gray-500 italic">Set email for notifications (optional)</label>
           <Input
             value={regEmail}
             onChange={(e) => setRegEmail(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
             className="mb-2 w-full"
           />
-          <Button onClick={handleRegister} size="md" className="text-md">Register</Button>
+          <Button onClick={handleRegister} size="md" className="text-md" disabled={isSubmitting}>{isSubmitting ? "Registering..." : "Register"}</Button>
         </Card>
       )}
 
