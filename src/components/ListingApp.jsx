@@ -545,6 +545,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
           />
           <label className="text-xs text-gray-500 italic">* Set own PIN (4-10 chars) to protect your registration</label>
           <Input
+            type="password"
             value={regPin}
             onChange={(e) => setRegPin(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleRegister()}
