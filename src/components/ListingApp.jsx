@@ -431,10 +431,10 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
           <h1 className="text-xl font-semibold">basketbo-lista</h1>
         </div>
         <div className="flex justify-end">
-          <Button onClick={handleListEvent} size="sm" className="text-sm bg-gray-500" title="List Events (For Admin)">
+          <Button onClick={handleListEvent} size="sm" className="text-sm bg-gray-500 p-2" title="List Events (For Admin)">
             <List className="w-4 h-4" />
           </Button>
-          <Button onClick={handleAddEvent} size="sm" className="text-sm bg-gray-500 ml-2" title="Add Event (For Admin)">
+          <Button onClick={handleAddEvent} size="sm" className="text-sm bg-gray-500 p-2 ml-2" title="Add Event (For Admin)">
             <CalendarPlus className="w-4 h-4" />
           </Button>
         </div>
@@ -460,7 +460,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             hour12: true}).toUpperCase()}</p>
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
-          <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-gray-400 text-xs" title="Copy Details">
+          <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-gray-400 text-xs p-2" title="Copy Details">
             Copy Details<Copy className="ml-1 w-4 h-4" />
           </Button>
         </Card>
@@ -493,8 +493,8 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                 className="mb-4"
               />
               <div className="flex justify-end space-x-2">
-                <Button type="submit">Submit</Button>
-                <Button type="button" className="bg-gray-400" onClick={() => setShowEventModal(false)}>Cancel</Button>
+                <Button type="submit" className="p-2">Submit</Button>
+                <Button type="button" className="p-2 bg-gray-400" onClick={() => setShowEventModal(false)}>Cancel</Button>
               </div>
             </form>
           </div>
@@ -532,19 +532,19 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
               
             </div>
             <div className="flex items-center text-xs">
-              <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs" title="Share Link">
+              <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs p-2" title="Share Link">
                 Copy Link<Share className="ml-1 w-4 h-4" />
               </Button>
-              <Button onClick={handleEditEvent} size="sm" className="flex items-center text-sm bg-orange-400 ml-2 text-xs" title="Edit Event">
+              <Button onClick={handleEditEvent} size="sm" className="flex items-center text-sm bg-orange-400 ml-2 text-xs p-2" title="Edit Event">
                 Edit<Pencil className="ml-1 w-4 h-4" />
               </Button>
-              <Button onClick={goToRegistrationsList} size="sm" className="flex items-center text-sm bg-blue-400 ml-2 text-xs" title="View Registrations">
+              <Button onClick={goToRegistrationsList} size="sm" className="flex items-center text-sm bg-blue-400 ml-2 text-xs p-2" title="View Registrations">
                 View<List className="ml-1 w-4 h-4" />
               </Button>
             </div>
             <hr className="my-4"/>
             <div className="flex justify-end space-x-2 mt-4">
-              <Button type="button" className="bg-gray-400" onClick={() => setShowListEventModal(false)}>Close</Button>
+              <Button type="button" className="bg-gray-400 p-2" onClick={() => setShowListEventModal(false)}>Close</Button>
             </div>
           </div>
         </div>
@@ -571,7 +571,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             onChange={(e) => setRegEmail(e.target.value)}
             className="mb-2 w-full"
           />
-          <Button onClick={handleRegister} size="md" className="text-md" disabled={isSubmitting}>{isSubmitting ? "Registering..." : "Register"}</Button>
+          <Button onClick={handleRegister} size="md" className="text-md p-2" disabled={isSubmitting}>{isSubmitting ? "Registering..." : "Register"}</Button>
         </Card>
       )}
 
@@ -592,10 +592,10 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                 }))}>{index + 1}. {reg.name}</span>
               </div>
               <div className="flex items-center space-x-1">
-                <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs py-1 w-20">
+                <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs px-2 py-1 w-20">
                   {reg.paid ? "Paid" : "Unpaid"}
                 </Button>
-                <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-400 text-xs py-1 mr-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
+                <Button onClick={() => handleCancel(reg.id)} size="sm" title="Cancel Registration" className="bg-red-400 text-xs px-2 py-1 mr-1" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="ml-1 w-4 h-4" />
                 </Button>
               </div>
@@ -617,7 +617,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                       hour12: true
                     }))}>{index + 1}. {reg.name}</span>
                   </div>
-                  <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-400 text-xs py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
+                  <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-400 text-xs px-2 py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="ml-1 w-4 h-4" /></Button>
                 </li>
               ))}
