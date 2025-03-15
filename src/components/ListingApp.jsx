@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { List, CalendarPlus, Share, Link, Trash, Pencil, Copy } from "lucide-react";
+import { List, CalendarPlus, Share, Link, Trash, Pencil, Copy, Info } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -580,11 +580,16 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
           <h2 className="text-md font-semibold my-3">Registrations</h2>
           {registrations.slice(0, selectedDateDetails.max).map((reg, index) => (
             <li key={`reg-${reg.id}`} className="flex justify-between items-center mb-1">
-              <div>
-                <span className="text-sm">{index + 1}. {reg.name}</span>
-                <span className="text-[10px] text-gray-500 ml-2 italic">
-                  {new Date(reg.timestamp).toLocaleTimeString()}
-                </span>
+              <div className="flex items-center space-x-1">
+                <span className="text-sm" onClick={() => alert(reg.name + " registered on " + new Date(reg.timestamp).toLocaleDateString("en-GB", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "numeric",
+                  second: "numeric",
+                  hour12: true
+                }))}>{index + 1}. {reg.name}</span>
               </div>
               <div className="flex items-center space-x-1">
                 <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs py-1 w-20">
@@ -601,11 +606,16 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
               <h3 className="text-md font-semibold mt-4 mb-2">Waitlist</h3>
               {registrations.slice(selectedDateDetails.max, registrations.length).map((reg, index) => (
                 <li key={`wait-${reg.id}`} className="flex justify-between items-center mb-1">
-                  <div>
-                  <span className="text-sm">{index + 1}. {reg.name}</span>
-                  <span className="text-[10px] text-gray-500 ml-2 italic">
-                    {new Date(reg.timestamp).toLocaleTimeString()}
-                  </span>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-sm" onClick={() => alert(reg.name + " wailisted on " + new Date(reg.timestamp).toLocaleDateString("en-GB", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "numeric",
+                      second: "numeric",
+                      hour12: true
+                    }))}>{index + 1}. {reg.name}</span>
                   </div>
                   <Button onClick={() => handleCancel(reg.id)} size="sm" className="bg-red-400 text-xs py-1" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="ml-1 w-4 h-4" /></Button>
