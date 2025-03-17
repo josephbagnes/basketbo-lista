@@ -87,7 +87,7 @@ const ListingApp = () => {
 
   const sendEmail = async (subjectSuffix, regData, isCancellation) => {
     try{
-      const toEmail = regData.email ? regData.email : 'noemail@gmail.com'
+      const toEmail = regData.email ? regData.email : 'boss.basketbolista@gmail.com'
       const regEmailDoc = {
         to: toEmail,
         message: {
