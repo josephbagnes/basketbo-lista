@@ -87,7 +87,7 @@ const ListingApp = () => {
 
   const sendEmail = async (subjectSuffix, regData, isCancellation) => {
     try{
-      const toEmail = regData.email ? regData.email : 'boss.basketbolista@gmail.com'
+      const toEmail = regData.email ? regData.email : 'boss.basketbolista@gmail.com';
       const regEmailDoc = {
         to: toEmail,
         message: {
@@ -115,9 +115,55 @@ const ListingApp = () => {
         const adminEmails = adminsSnapshot.docs
                           .map(doc => doc.data().email)
                           .filter(email => email);
-        regEmailDoc.bcc = adminEmails;
+        if(adminEmails){
+          regEmailDoc.bcc = adminEmails;
+        }
       }
       addDoc(collection(db, "mail"), regEmailDoc);
+    }catch (error) {
+      console.error("Error saving email: ", error);
+    }
+  };
+
+  const notifyNextInWaitlist = async (updatedRegList) => {
+    try{
+
+      if(updatedRegList.length >= selectedDateDetails.max){
+        const regData = updatedRegList[selectedDateDetails.max - 1];
+        if(regData){
+          const toEmail = regData.email ? regData.email : 'boss.basketbolista@gmail.com';
+          const regEmailDoc = {
+            to: toEmail,
+            message: {
+              subject: `[basketbo-lista] Waitlist upgraded to registered`,
+              html: `<b>Date</b>: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            weekday: "short",
+                          }).toUpperCase().replace(",", "") || ''}<br><b>Time</b>: ${new Date(`1970-01-01T${selectedDateDetails.startTime}:00`).toLocaleTimeString("en-GB", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true}).toUpperCase() + ' - ' + new Date(`1970-01-01T${selectedDateDetails.endTime}:00`).toLocaleTimeString("en-GB", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true}).toUpperCase() || ''}<br><b>Venue</b>: ${selectedDateDetails.venue || ''}<br><br><b>Name</b>: ${regData.name || ''}`
+            }
+          }
+
+          const adminsSnapshot = await getDocs(collection(db, "admins"));
+          const adminEmails = adminsSnapshot.docs
+                            .map(doc => doc.data().email)
+                            .filter(email => email);
+          if(adminEmails){
+            regEmailDoc.bcc = adminEmails;
+          }
+          addDoc(collection(db, "mail"), regEmailDoc);
+        }
+      }else{
+        console.log("No waitlist to notify...")
+      }
+
     }catch (error) {
       console.error("Error saving email: ", error);
     }
@@ -211,7 +257,7 @@ END:VCALENDAR`;
     }
   };
 
-  const handleCancel = async (id) => { 
+  const handleCancel = async (id, isWaitlist) => { 
     try {
       const pin = prompt("Enter Registration PIN or Admin PIN to cancel:");
       if (!pin) return;
@@ -238,10 +284,14 @@ END:VCALENDAR`;
         localStorage.setItem("myAdminPin", pin);
       }
 
-      sendEmail('Cancellation', registrationDoc.data(), true);
+      sendEmail(`${isWaitlist ? 'Waitlist ' : ''}Cancellation`, registrationDoc.data(), true);
 
       await deleteDoc(docRef);
-      setRegistrations(registrations.filter((reg) => reg.id !== id));
+      const updatedRegList = registrations.filter((reg) => reg.id !== id);
+      setRegistrations(updatedRegList);
+      if(!isWaitlist){
+        setTimeout(() => notifyNextInWaitlist(updatedRegList), 1000);
+      }
     } catch (error) {
       console.error("Error cancelling registration: ", error);
     }
@@ -628,7 +678,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                 <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs px-2 py-1 w-18 rounded-md">
                   {reg.paid ? "Paid" : "Unpaid"}
                 </Button>
-                <Button onClick={() => handleCancel(reg.id)} size="xs" title="Cancel Registration" className="bg-white text-xs p-1 rounded-full" disabled={isPastDate(selectedDateDetails?.date)}>
+                <Button onClick={() => handleCancel(reg.id, false)} size="xs" title="Cancel Registration" className="bg-white text-xs p-1 rounded-full" disabled={isPastDate(selectedDateDetails?.date)}>
                   <Trash className="w-4 h-4 text-red-500" />
                 </Button>
               </div>
@@ -650,7 +700,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                       hour12: true
                     }))}>{index + 1}. {reg.name}</span>
                   </div>
-                  <Button onClick={() => handleCancel(reg.id)} size="xs" className="bg-white text-xs p-1 rounded-full" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
+                  <Button onClick={() => handleCancel(reg.id, true)} size="xs" className="bg-white text-xs p-1 rounded-full" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
                     <Trash className="w-4 h-4 text-red-500" />
                   </Button>
                 </li>
