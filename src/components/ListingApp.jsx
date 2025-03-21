@@ -688,7 +688,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                 }))}>{index + 1}. {reg.name}</span>
               </div>
               <div className="flex items-center space-x-1">
-                <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs px-2 py-1 w-18 rounded-md">
+                <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs px-2 py-1 w-18 rounded-md w-14">
                   {reg.paid ? "Paid" : "Unpaid"}
                 </Button>
                 <Button onClick={() => handleCancel(reg.id, false)} size="xs" title="Cancel Registration" className="bg-white text-xs p-1 rounded-full">
