@@ -259,29 +259,42 @@ END:VCALENDAR`;
 
   const handleCancel = async (id, isWaitlist) => { 
     try {
-      const pin = prompt("Enter Registration PIN or Admin PIN to cancel:");
-      if (!pin) return;
-
-      const adminsSnapshot = await getDocs(collection(db, "admins"));
-      const isAdmin = adminsSnapshot.docs.some((doc) => doc.data().pin === pin);
 
       const docRef = doc(db, "dates", selectedDate, "registrations", id);
       const registrationDoc = await getDoc(docRef);
 
-      if (!isAdmin && !registrationDoc.data().pin) {
-        alert("Registration has no PIN, only Admin can cancel");
-        return;
-      }
-
-      const isPinMatching = registrationDoc.data().pin === pin;
-
-      if (!isAdmin && !isPinMatching) {
-        alert("Invalid PIN!");
-        return;
-      }
-
-      if(isAdmin){
+      if(isPastDate(selectedDateDetails?.date)){
+        const pin = prompt("Only Admin can cancel same or past date events, Enter Admin PIN:");
+        if (!pin) return;
+        const adminsSnapshot = await getDocs(collection(db, "admins"));
+        const isAdmin = adminsSnapshot.docs.some((doc) => doc.data().pin === pin);
+        if (!isAdmin) {
+          alert("Invalid Admin PIN!");
+          return;
+        }
         localStorage.setItem("myAdminPin", pin);
+      }else{
+        const pin = prompt("Enter Registration PIN or Admin PIN to cancel:");
+        if (!pin) return;
+
+        const adminsSnapshot = await getDocs(collection(db, "admins"));
+        const isAdmin = adminsSnapshot.docs.some((doc) => doc.data().pin === pin);
+
+        if (!isAdmin && !registrationDoc.data().pin) {
+          alert("Registration has no PIN, only Admin can cancel");
+          return;
+        }
+
+        const isPinMatching = registrationDoc.data().pin === pin;
+
+        if (!isAdmin && !isPinMatching) {
+          alert("Invalid PIN!");
+          return;
+        }
+
+        if(isAdmin){
+          localStorage.setItem("myAdminPin", pin);
+        }
       }
 
       sendEmail(`${isWaitlist ? 'Waitlist ' : ''}Cancellation`, registrationDoc.data(), true);
@@ -678,7 +691,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                 <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs px-2 py-1 w-18 rounded-md">
                   {reg.paid ? "Paid" : "Unpaid"}
                 </Button>
-                <Button onClick={() => handleCancel(reg.id, false)} size="xs" title="Cancel Registration" className="bg-white text-xs p-1 rounded-full" disabled={isPastDate(selectedDateDetails?.date)}>
+                <Button onClick={() => handleCancel(reg.id, false)} size="xs" title="Cancel Registration" className="bg-white text-xs p-1 rounded-full">
                   <Trash className="w-4 h-4 text-red-500" />
                 </Button>
               </div>
@@ -700,7 +713,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                       hour12: true
                     }))}>{index + 1}. {reg.name}</span>
                   </div>
-                  <Button onClick={() => handleCancel(reg.id, true)} size="xs" className="bg-white text-xs p-1 rounded-full" title="Cancel Registration" disabled={isPastDate(selectedDateDetails?.date)}>
+                  <Button onClick={() => handleCancel(reg.id, true)} size="xs" className="bg-white text-xs p-1 rounded-full" title="Cancel Registration">
                     <Trash className="w-4 h-4 text-red-500" />
                   </Button>
                 </li>
