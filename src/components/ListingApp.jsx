@@ -119,6 +119,7 @@ const ListingApp = () => {
           regEmailDoc.bcc = adminEmails;
         }
       }
+      regEmailDoc.message.html += `<br><br><b>Link</b>: ${window.location.href}`;
       addDoc(collection(db, "mail"), regEmailDoc);
     }catch (error) {
       console.error("Error saving email: ", error);
@@ -158,6 +159,7 @@ const ListingApp = () => {
           if(adminEmails){
             regEmailDoc.bcc = adminEmails;
           }
+          regEmailDoc.message.html += `<br><br><b>Link</b>: ${window.location.href}`;
           addDoc(collection(db, "mail"), regEmailDoc);
         }
       }else{
@@ -184,6 +186,7 @@ DTSTAMP:${startDateTime}
 DTSTART:${startDateTime}
 DTEND:${endDateTime}
 SUMMARY:${selectedDateDetails.venue}
+URL:${window.location.href}
 END:VEVENT
 END:VCALENDAR`;
     
