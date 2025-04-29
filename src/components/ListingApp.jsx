@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { List, CalendarPlus, Share, Link, Trash, Pencil, Copy, CalendarArrowDown } from "lucide-react";
+import { List, CalendarPlus, Share, Trash, Pencil, Copy, CalendarArrowDown } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,9 @@ import {
   updateDoc,
   query,
   orderBy,
-  setDoc,
 } from "firebase/firestore";
 import blIcon from "@/assets/blIcon.png";
+import { copyDetails, downloadIcs, sendEmail } from "@/services/utils";
 
 const ListingApp = () => {
   const [name, setName] = useState("");
@@ -85,120 +85,8 @@ const ListingApp = () => {
     }
   }, [selectedDate, dates]);
 
-  const sendEmail = async (subjectSuffix, regData, isCancellation) => {
-    try{
-      const toEmail = regData.email ? regData.email : 'boss.basketbolista@gmail.com';
-      const regEmailDoc = {
-        to: toEmail,
-        message: {
-          subject: `[basketbo-lista] ${subjectSuffix}`,
-          html: `<b>Date</b>: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        weekday: "short",
-                      }).toUpperCase().replace(",", "") || ''}<br><b>Time</b>: ${new Date(`1970-01-01T${selectedDateDetails.startTime}:00`).toLocaleTimeString("en-GB", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true}).toUpperCase() + ' - ' + new Date(`1970-01-01T${selectedDateDetails.endTime}:00`).toLocaleTimeString("en-GB", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true}).toUpperCase() || ''}<br><b>Venue</b>: ${selectedDateDetails.venue || ''}<br><br><b>Name</b>: ${regData.name || ''}`
-        }
-      }
 
-      if(!isCancellation){
-        regEmailDoc.message.html += `<br><b>PIN</b>: ${regData.pin || ''}`;
-      }
-      if(isCancellation){
-        const adminsSnapshot = await getDocs(collection(db, "admins"));
-        const adminEmails = adminsSnapshot.docs
-                          .map(doc => doc.data().email)
-                          .filter(email => email);
-        if(adminEmails){
-          regEmailDoc.bcc = adminEmails;
-        }
-      }
-      regEmailDoc.message.html += `<br><br><b>Link</b>: ${window.location.href}`;
-      addDoc(collection(db, "mail"), regEmailDoc);
-    }catch (error) {
-      console.error("Error saving email: ", error);
-    }
-  };
 
-  const notifyNextInWaitlist = async (updatedRegList) => {
-    try{
-
-      if(updatedRegList.length >= selectedDateDetails.max){
-        const regData = updatedRegList[selectedDateDetails.max - 1];
-        if(regData){
-          const toEmail = regData.email ? regData.email : 'boss.basketbolista@gmail.com';
-          const regEmailDoc = {
-            to: toEmail,
-            message: {
-              subject: `[basketbo-lista] Waitlist upgraded to registered`,
-              html: `<b>Date</b>: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            weekday: "short",
-                          }).toUpperCase().replace(",", "") || ''}<br><b>Time</b>: ${new Date(`1970-01-01T${selectedDateDetails.startTime}:00`).toLocaleTimeString("en-GB", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                            hour12: true}).toUpperCase() + ' - ' + new Date(`1970-01-01T${selectedDateDetails.endTime}:00`).toLocaleTimeString("en-GB", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                            hour12: true}).toUpperCase() || ''}<br><b>Venue</b>: ${selectedDateDetails.venue || ''}<br><br><b>Name</b>: ${regData.name || ''}`
-            }
-          }
-
-          const adminsSnapshot = await getDocs(collection(db, "admins"));
-          const adminEmails = adminsSnapshot.docs
-                            .map(doc => doc.data().email)
-                            .filter(email => email);
-          if(adminEmails){
-            regEmailDoc.bcc = adminEmails;
-          }
-          regEmailDoc.message.html += `<br><br><b>Link</b>: ${window.location.href}`;
-          addDoc(collection(db, "mail"), regEmailDoc);
-        }
-      }else{
-        console.log("No waitlist to notify...")
-      }
-
-    }catch (error) {
-      console.error("Error saving email: ", error);
-    }
-  };
-
-  const downloadIcs = async () => {
-    const formatDateTime = (date, time) => {
-      return new Date(`${date}T${time}:00`).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-    };
-    const startDateTime = formatDateTime(selectedDateDetails.date, selectedDateDetails.startTime);
-    const endDateTime = formatDateTime(selectedDateDetails.date, selectedDateDetails.endTime);
-    const icsContent = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//basketbo-lista.com//Game Schedule//EN
-BEGIN:VEVENT
-UID:${new Date().getTime()}@basketbo-lista.com
-DTSTAMP:${startDateTime}
-DTSTART:${startDateTime}
-DTEND:${endDateTime}
-SUMMARY:${selectedDateDetails.venue}
-URL:${window.location.href}
-END:VEVENT
-END:VCALENDAR`;
-    
-    const blob = new Blob([icsContent], { type: "text/calendar" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `event-${selectedDate}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
 
   const handleRegister = async () => {
 
@@ -484,44 +372,13 @@ END:VCALENDAR`;
     }
   };
 
-  const copyDetails = () => {
-    if (selectedDateDetails) {
-      const text = `Link: ${window.location.href}
-      
-Date: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        weekday: "short",
-      }).toUpperCase().replace(",", "") || ''}
-Venue: ${selectedDateDetails.venue || ''}
-Max: ${selectedDateDetails.max + ' players' || ''}
-Time: ${new Date(`1970-01-01T${selectedDateDetails.startTime}:00`).toLocaleTimeString("en-GB", {
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true}).toUpperCase() + ' - ' + new Date(`1970-01-01T${selectedDateDetails.endTime}:00`).toLocaleTimeString("en-GB", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true}).toUpperCase() || ''}
-Pay To: ${selectedDateDetails.pay_to || ''}
-
-Registrations:
-${(registrations || []).slice(0, selectedDateDetails.max).map((r, i) => `${i + 1}. ${r.name} ${r.paid ? ' - Paid' : ''}`).join('\n')}
-
-Waitlist:
-${(registrations || []).slice(selectedDateDetails.max, registrations.length).map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`;
-      navigator.clipboard.writeText(text.toString());
-      alert("Full details copied to clipboard!");
-    }
-  };
-
   const isPastDate = (date) => new Date(date) < new Date();
 
   return (
     <div className="p-1">
       <div className="flex items-center justify-between bg-blue-200 text-gray py-4 px-6 mb-4 rounded-md shadow-md">
         <div className="flex justify-start">
-          <img src={blIcon} className="w-8 mr-2" />
+          <img src={blIcon} alt="basketbo-lista" className="w-8 mr-2" />
           <h1 className="text-xl font-semibold">basketbo-lista</h1>
         </div>
         <div className="flex justify-end">
@@ -555,10 +412,10 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
           <div className="flex">
-            <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-white text-xs p-2 rounded-full" title="Copy Details">
+            <Button onClick={() => copyDetails(selectedDateDetails, registrations)} size="sm" className="flex items-center bg-white text-xs p-2 rounded-full" title="Copy Details">
               <Copy className="w-6 h-6 text-blue-500" />
             </Button>
-            <Button onClick={downloadIcs} size="sm" className="flex items-center text-sm bg-white text-xs p-2 rounded-full ml-2" title="Download Calendar">
+            <Button onClick={downloadIcs} size="sm" className="flex items-center bg-white text-xs p-2 rounded-full ml-2" title="Download Calendar">
               <CalendarArrowDown className="w-6 h-6 text-blue-500" />
             </Button>
           </div>
@@ -631,13 +488,13 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
               
             </div>
             <div className="flex items-center text-xs">
-              <Button onClick={generateShareableLink} size="sm" className="flex items-center text-sm bg-orange-400 text-xs p-2 rounded-xl" title="Share Link">
+              <Button onClick={generateShareableLink} size="sm" className="flex items-center bg-orange-400 text-xs p-2 rounded-xl" title="Share Link">
                 Copy Link<Share className="ml-1 w-4 h-4" />
               </Button>
-              <Button onClick={handleEditEvent} size="sm" className="flex items-center text-sm bg-orange-400 ml-2 text-xs p-2 rounded-xl" title="Edit Event">
+              <Button onClick={handleEditEvent} size="sm" className="flex items-center bg-orange-400 ml-2 text-xs p-2 rounded-xl" title="Edit Event">
                 Edit<Pencil className="ml-1 w-4 h-4" />
               </Button>
-              <Button onClick={goToRegistrationsList} size="sm" className="flex items-center text-sm bg-blue-400 ml-2 text-xs p-2 rounded-xl" title="View Registrations">
+              <Button onClick={goToRegistrationsList} size="sm" className="flex items-center bg-blue-400 ml-2 text-xs p-2 rounded-xl" title="View Registrations">
                 View<List className="ml-1 w-4 h-4" />
               </Button>
             </div>
