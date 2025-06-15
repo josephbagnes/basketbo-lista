@@ -566,7 +566,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
       )}
       
       {showEventModal && (
-        <div className="fixed inset-0 bg-gray-300 bg-opacity-50 flex items-center justify-center text-sm">
+        <div className="inset-0 bg-gray-300 bg-opacity-50 flex items-center justify-center text-sm">
           <div className="bg-white p-6 rounded shadow-md max-w-sm w-full">
             <h2 className="text-lg mb-4">{isEditMode ? "Edit Event" : "Add New Event"}</h2>
             <form onSubmit={submitEvent} className="flex flex-col">
