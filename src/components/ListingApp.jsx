@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { List, CalendarPlus, Share, Link, Trash, Pencil, Copy, CalendarArrowDown } from "lucide-react";
+import { Link as RouterLink } from "react-router-dom";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -523,6 +524,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
         <div className="flex justify-start">
           <img src={blIcon} className="w-8 mr-2" />
           <h1 className="text-xl font-semibold">basketbo-lista</h1>
+          <RouterLink to="/app" className="ml-4 text-blue-700 underline">Go to App</RouterLink>
         </div>
         <div className="flex justify-end">
           <Button onClick={handleListEvent} size="sm" className="text-sm bg-gray-500 p-2 rounded-full" title="List Events (For Admin)">
