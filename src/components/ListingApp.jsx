@@ -2,9 +2,9 @@ import React, { useEffect, useState } from "react";
 import { List, CalendarPlus, Share, Link, Trash, Pencil, Copy, CalendarArrowDown } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { db } from "@/firebase";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Card } from "@/components/old/card";
+import { Button } from "@/components/old/button";
+import { Input } from "@/components/old/input";
 import {
   collection,
   addDoc,
@@ -18,6 +18,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import blIcon from "@/assets/blIcon.png";
+import '@/index.css';
 
 const ListingApp = () => {
   const [name, setName] = useState("");
