@@ -103,7 +103,10 @@ const ListingApp = () => {
       
       const querySnapshot = await getDocs(eventsQuery);
       const fetchedDates = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setDates(fetchedDates);
+      
+      // Ensure events are sorted by latest date first (newest to oldest)
+      const sortedDates = fetchedDates.sort((a, b) => new Date(b.date) - new Date(a.date));
+      setDates(sortedDates);
     };
     fetchDates();
   }, []);
@@ -554,35 +557,38 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
   const isPastDate = (date) => new Date(date) < new Date();
 
   return (
-    <div className="p-1">
-      <div className="flex items-center justify-between bg-blue-200 text-gray py-4 px-6 mb-4 rounded-md shadow-md">
+    <div className="p-2 md:p-4">
+      <div className="flex items-center justify-between bg-blue-200 text-gray py-3 md:py-4 px-4 md:px-6 mb-4 rounded-md shadow-md">
         <div className="flex justify-start">
-          <img src={blIcon} className="w-8 mr-2" />
-          <h1 className="text-xl font-semibold">basketbo-lista</h1>
+          <img src={blIcon} className="w-6 md:w-8 mr-2" />
+          <h1 className="text-lg md:text-xl font-semibold">basketbo-lista</h1>
         </div>
-        <div className="flex justify-end space-x-2">
+        <div className="flex justify-end space-x-1 md:space-x-2">
           {user && (
-            <Button onClick={handleSignOut} size="sm" className="text-sm bg-gray-500 p-2 rounded-full" title="Sign Out">
-              <LogOut className="w-4 h-4" />
+            <Button onClick={handleSignOut} size="sm" className="text-xs md:text-sm bg-gray-500 p-1.5 md:p-2 rounded-full" title="Sign Out">
+              <LogOut className="w-3 md:w-4 h-3 md:h-4" />
             </Button>
           )}
-          <Button onClick={() => window.location.href = '/'} size="sm" className="text-sm bg-gray-500 p-2 rounded-full" title="Home">
-            <Home className="w-4 h-4" />
+          <Button onClick={() => window.location.href = '/'} size="sm" className="text-xs md:text-sm bg-gray-500 p-1.5 md:p-2 rounded-full" title="Home">
+            <Home className="w-3 md:w-4 h-3 md:h-4" />
           </Button>
         </div>
       </div>
 
       {selectedDateDetails && (
-        <Card className="mb-4 text-sm">
-          <div className="mt-2 mb-4">
-            <p><strong>Date:</strong> {new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
+        <Card className="mb-4 p-4 md:p-6">
+          <div className="space-y-2 md:space-y-3 mb-4 text-sm md:text-base">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
+              <p><strong>Date:</strong> {new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
         year: "numeric",
         month: "short",
         day: "numeric",
         weekday: "short",
       }).toUpperCase().replace(",", "")}</p>
-            <p><strong>Venue:</strong> {selectedDateDetails.venue}</p>
-            <p><strong>Max:</strong> {selectedDateDetails.max} players</p>
+              <p><strong>Venue:</strong> {selectedDateDetails.venue}</p>
+              <p><strong>Max:</strong> {selectedDateDetails.max} players</p>
+              <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
+            </div>
             <p><strong>Time:</strong> {new Date(`1970-01-01T${selectedDateDetails.startTime}:00`).toLocaleTimeString("en-GB", {
             hour: "numeric",
             minute: "2-digit",
@@ -590,27 +596,28 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             hour: "numeric",
             minute: "2-digit",
             hour12: true}).toUpperCase()}</p>
-            <p><strong>Pay To:</strong> {selectedDateDetails.pay_to}</p>
           </div>
-          <div className="flex">
-            <Button onClick={copyDetails} size="sm" className="flex items-center text-sm bg-white text-xs p-2 rounded-full" title="Copy Details">
-              <Copy className="w-6 h-6 text-blue-500" />
+          <div className="flex space-x-2">
+            <Button onClick={copyDetails} size="sm" className="flex items-center text-xs md:text-sm bg-white px-3 py-2 rounded-lg border" title="Copy Details">
+              <Copy className="w-4 h-4 text-blue-500 mr-1" />
+              <span className="hidden sm:inline">Copy</span>
             </Button>
-            <Button onClick={downloadIcs} size="sm" className="flex items-center text-sm bg-white text-xs p-2 rounded-full ml-2" title="Download Calendar">
-              <CalendarArrowDown className="w-6 h-6 text-blue-500" />
+            <Button onClick={downloadIcs} size="sm" className="flex items-center text-xs md:text-sm bg-white px-3 py-2 rounded-lg border" title="Download Calendar">
+              <CalendarArrowDown className="w-4 h-4 text-blue-500 mr-1" />
+              <span className="hidden sm:inline">Calendar</span>
             </Button>
           </div>
         </Card>
       )}
 
       {selectedDate && isOpenForRegistration && !isPastDate(selectedDateDetails?.date) && (
-        <Card className="mb-4 text-sm">
+        <Card className="mb-4 p-4 md:p-6">
           <div className="mb-4">
-            <h3 className="text-md font-semibold mb-3">Register for this Event</h3>
+            <h3 className="text-lg md:text-xl font-semibold mb-4 text-center md:text-left">Register for this Event</h3>
             
             {/* Registration Method Selection */}
             <div className="mb-4">
-              <div className="flex space-x-4 mb-3">
+              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4 mb-3">
                 <label className="flex items-center">
                   <input 
                     type="radio" 
@@ -679,32 +686,38 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             )}
 
             {/* Registration Form */}
-            <div>
-              <label className="text-xs text-gray-500 italic">* Name (1-20 chars)</label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mb-2 w-full"
-                placeholder={user?.displayName || "Enter your name"}
-              />
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-500 italic mb-1">* Name (1-20 chars)</label>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full"
+                  placeholder={user?.displayName || "Enter your name"}
+                />
+              </div>
               
               {registrationMethod === "pin" && (
                 <>
-                  <label className="text-xs text-gray-500 italic">* Set own PIN (4-10 chars) to protect your registration</label>
-                  <Input
-                    type="password"
-                    value={regPin}
-                    onChange={(e) => setRegPin(e.target.value)}
-                    className="mb-2 w-full"
-                    placeholder="Create a secure PIN"
-                  />
-                  <label className="text-xs text-gray-500 italic">Set email for notifications (optional)</label>
-                  <Input
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    className="mb-2 w-full"
-                    placeholder="your.email@example.com"
-                  />
+                  <div>
+                    <label className="block text-xs text-gray-500 italic mb-1">* Set own PIN (4-10 chars) to protect your registration</label>
+                    <Input
+                      type="password"
+                      value={regPin}
+                      onChange={(e) => setRegPin(e.target.value)}
+                      className="w-full"
+                      placeholder="Create a secure PIN"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 italic mb-1">Set email for notifications (optional)</label>
+                    <Input
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      className="w-full"
+                      placeholder="your.email@example.com"
+                    />
+                  </div>
                 </>
               )}
             </div>
@@ -726,10 +739,10 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
       )}
 
       {isOpenForRegistration && registrations.length > 0 && (
-        <Card className="mb-4">
-          <h2 className="text-md font-semibold my-3">Registrations</h2>
+        <Card className="mb-4 p-4 md:p-6">
+          <h2 className="text-lg md:text-xl font-semibold mb-4">Registrations</h2>
           {registrations.slice(0, selectedDateDetails.max).map((reg, index) => (
-            <li key={`reg-${reg.id}`} className="flex justify-between items-center mb-1">
+            <div key={`reg-${reg.id}`} className="flex justify-between items-center mb-1">
               <div className="flex items-center space-x-1">
                 <span className="text-sm" onClick={() => alert(reg.name + " registered on " + new Date(reg.timestamp).toLocaleDateString("en-GB", {
                   year: "numeric",
@@ -742,20 +755,20 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                 }))}>{index + 1}. {reg.name}</span>
               </div>
               <div className="flex items-center space-x-1">
-                <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="xs" variant={reg.paid ? "secondary" : "outline"} className="text-xs px-2 py-1 w-18 rounded-md w-14">
+                <Button onClick={() => handleTogglePaid(reg.id, reg.paid)} size="sm" variant={reg.paid ? "secondary" : "outline"} className="text-xs px-2 py-1 rounded-md">
                   {reg.paid ? "Paid" : "Unpaid"}
                 </Button>
-                <Button onClick={() => handleCancel(reg.id, false)} size="xs" title="Cancel Registration" className="bg-white text-xs p-1 rounded-full">
+                <Button onClick={() => handleCancel(reg.id, false)} size="sm" title="Cancel Registration" className="bg-white text-xs p-1 rounded-full">
                   <Trash className="w-4 h-4 text-red-500" />
                 </Button>
               </div>
-            </li>
+            </div>
           ))}
           {registrations.length > selectedDateDetails.max && (
             <>
-              <h3 className="text-md font-semibold mt-6 mb-2">Waitlist</h3>
+              <h3 className="text-lg font-semibold mt-6 mb-2">Waitlist</h3>
               {registrations.slice(selectedDateDetails.max, registrations.length).map((reg, index) => (
-                <li key={`wait-${reg.id}`} className="flex justify-between items-center mb-1">
+                <div key={`wait-${reg.id}`} className="flex justify-between items-center mb-1">
                   <div className="flex items-center space-x-1">
                     <span className="text-sm" onClick={() => alert(reg.name + " waitlisted on " + new Date(reg.timestamp).toLocaleDateString("en-GB", {
                       year: "numeric",
@@ -767,31 +780,31 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                       hour12: true
                     }))}>{index + 1}. {reg.name}</span>
                   </div>
-                  <Button onClick={() => handleCancel(reg.id, true)} size="xs" className="bg-white text-xs p-1 rounded-full" title="Cancel Registration">
+                  <Button onClick={() => handleCancel(reg.id, true)} size="sm" className="bg-white text-xs p-1 rounded-full" title="Cancel Registration">
                     <Trash className="w-4 h-4 text-red-500" />
                   </Button>
-                </li>
+                </div>
               ))}
             </>
           )}
         </Card>
       )}
       {selectedDateDetails && !isOpenForRegistration && (
-        <Card className="mb-4 text-sm">
-          <p className="italic">Not open for registration yet</p>
+        <Card className="mb-4 p-4 md:p-6 text-center">
+          <p className="text-gray-600 italic">Registration is not open for this event</p>
         </Card>
       )}
       
       {!selectedDateDetails && (
-        <Card className="mb-4 text-center py-8">
-          <h2 className="text-lg font-semibold mb-2">No Event Selected</h2>
-          <p className="text-gray-600 mb-4">
+        <Card className="mb-4 p-6 md:p-8 text-center">
+          <h2 className="text-lg md:text-xl font-semibold mb-3">No Event Selected</h2>
+          <p className="text-gray-600 mb-4 text-sm md:text-base">
             {new URLSearchParams(window.location.search).get("groupId") 
               ? "Please select an event from a valid shared link from your league admin." 
               : "Please select an event from a shared link or contact your league admin."
             }
           </p>
-          <Button onClick={() => window.location.href = '/'}>
+          <Button onClick={() => window.location.href = '/'} className="w-full sm:w-auto">
             Go to Home Page
           </Button>
         </Card>

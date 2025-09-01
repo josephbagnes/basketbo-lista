@@ -4,19 +4,18 @@ import { Card } from "@/components/ui/card";
 import { 
   Calendar, 
   List, 
-  User, 
   LogOut,
   MapPin,
   Clock,
   Users,
-  Home
+  Home,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { db } from "@/firebase";
 import { 
   collection, 
-  getDocs, 
-  query, 
-  where 
+  getDocs
 } from "firebase/firestore";
 import { 
   getAuth, 
@@ -36,6 +35,7 @@ const UserDashboard = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
+  const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
 
   const auth = getAuth();
 
@@ -78,9 +78,15 @@ const UserDashboard = () => {
         });
       }
 
-      // Sort by event date
-      userRegs.sort((a, b) => new Date(a.event.date) - new Date(b.event.date));
-      setRegistrations(userRegs);
+      // Sort by event date and remove duplicates based on event.id
+      const sortedRegs = userRegs.sort((a, b) => new Date(b.event.date) - new Date(a.event.date));
+      
+      // Filter to only unique events (in case user registered multiple times for same event)
+      const uniqueRegs = sortedRegs.filter((reg, index, array) => 
+        index === array.findIndex(r => r.event.id === reg.event.id)
+      );
+      
+      setRegistrations(uniqueRegs);
     } catch (error) {
       console.error("Error loading user registrations:", error);
     }
@@ -141,6 +147,124 @@ const UserDashboard = () => {
     url.searchParams.set("startTime", event.startTime);
     url.searchParams.set("endTime", event.endTime);
     return url.toString();
+  };
+
+  // Calendar helper functions
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const getEventsForDate = (date) => {
+    // Format date as YYYY-MM-DD in local timezone to avoid UTC conversion issues
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    const eventsForDay = registrations.filter(reg => reg.event.date === dateStr);
+    return eventsForDay;
+  };
+
+  const navigateMonth = (direction) => {
+    setCurrentCalendarMonth(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() + direction);
+      return newDate;
+    });
+  };
+
+  const goToToday = () => {
+    setCurrentCalendarMonth(new Date());
+  };
+
+  const renderCalendarView = () => {
+    const daysInMonth = getDaysInMonth(currentCalendarMonth);
+    const firstDay = getFirstDayOfMonth(currentCalendarMonth);
+    const monthName = currentCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    const days = [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    // Empty cells for days before the first day of the month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="h-24 md:h-32"></div>);
+    }
+    
+    // Days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      // Create date in local timezone to avoid timezone shift issues
+      const date = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth(), day);
+      const eventsForDay = getEventsForDate(date);
+      const isToday = date.toDateString() === new Date().toDateString();
+      
+      days.push(
+        <div key={day} className={`h-24 md:h-32 border border-gray-200 p-1 md:p-2 overflow-hidden ${isToday ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}>
+          <div className={`text-sm md:text-base font-medium mb-1 ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+            {day}
+          </div>
+          <div className="space-y-1">
+            {eventsForDay.slice(0, 2).map((reg, index) => (
+              <div 
+                key={index}
+                className="text-xs bg-blue-100 text-blue-800 p-1 rounded cursor-pointer hover:bg-blue-200 transition-colors"
+                onClick={() => window.open(generateEventLink(reg.event), '_blank')}
+                title={`${reg.event.venue} - ${reg.event.startTime}`}
+              >
+                <div className="font-medium truncate">{reg.event.venue}</div>
+                <div className="truncate">
+                  {new Date(`1970-01-01T${reg.event.startTime}:00`).toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true
+                  })}
+                </div>
+              </div>
+            ))}
+            {eventsForDay.length > 2 && (
+              <div className="text-xs text-gray-500">+{eventsForDay.length - 2} more</div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <Card className="p-4 md:p-6">
+        {/* Calendar Header */}
+        <div className="flex items-center justify-between mb-6">
+          <Button variant="outline" size="sm" onClick={() => navigateMonth(-1)}>
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <div className="flex items-center space-x-2">
+            <h3 className="text-lg md:text-xl font-semibold">{monthName}</h3>
+            <Button variant="outline" size="xs" onClick={goToToday} title="Go to current month">
+              Today
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigateMonth(1)}>
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {/* Day Names */}
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {dayNames.map(dayName => (
+            <div key={dayName} className="text-center text-sm font-medium text-gray-500 py-2">
+              {dayName}
+            </div>
+          ))}
+        </div>
+        
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7 gap-1">
+          {days}
+        </div>
+      </Card>
+    );
   };
 
   if (loading) {
@@ -217,11 +341,12 @@ const UserDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between bg-white rounded-lg shadow-sm p-6 mb-8">
+        {/* Desktop Header */}
+        <div className="hidden md:flex items-center justify-between bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-center">
             <img src={blIcon} className="w-10 h-10 mr-4" alt="Basketball Logo" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">My Events</h1>
+              <h1 className="text-2xl font-bold text-gray-800">My Games</h1>
               <p className="text-gray-600">{user?.displayName || user?.email}</p>
             </div>
           </div>
@@ -237,24 +362,52 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-800">Your Registered Events</h2>
+        {/* Mobile Header */}
+        <div className="md:hidden mb-8">
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-4">
+            <div className="flex items-center mb-4">
+              <img src={blIcon} className="w-10 h-10 mr-4" alt="Basketball Logo" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">My Games</h1>
+                <p className="text-gray-600">{user?.displayName || user?.email}</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Mobile Controls Card */}
+          <Card className="p-4">
+            <div className="grid grid-cols-1 gap-3">
+              <Button variant="outline" size="sm" onClick={() => window.location.href = '/'} className="w-full">
+                <Home className="w-4 h-4 mr-2" />
+                Home
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleSignOut} className="w-full">
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+          </Card>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
           <div className="flex space-x-2">
             <Button 
               variant={viewMode === 'list' ? 'default' : 'outline'} 
               size="sm"
               onClick={() => setViewMode('list')}
+              className="flex-1 sm:flex-none"
             >
               <List className="w-4 h-4 mr-2" />
-              List View
+              List
             </Button>
             <Button 
               variant={viewMode === 'calendar' ? 'default' : 'outline'} 
               size="sm"
               onClick={() => setViewMode('calendar')}
+              className="flex-1 sm:flex-none"
             >
               <Calendar className="w-4 h-4 mr-2" />
-              Calendar View
+              Calendar
             </Button>
           </div>
         </div>
@@ -269,70 +422,76 @@ const UserDashboard = () => {
             </Button>
           </Card>
         ) : (
-          <div className={viewMode === 'list' ? 'space-y-4' : 'grid gap-4 md:grid-cols-2 lg:grid-cols-3'}>
-            {registrations.map((reg) => (
-              <Card key={`${reg.event.id}-${reg.regId}`} className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800">{reg.event.venue}</h3>
-                    {isUpcomingEvent(reg.event.date) && (
-                      <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full mt-1">
-                        Upcoming
-                      </span>
-                    )}
-                    {isPastEvent(reg.event.date) && (
-                      <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full mt-1">
-                        Past Event
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="space-y-2 text-sm text-gray-600 mb-4">
-                  <div className="flex items-center">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    {new Date(reg.event.date).toLocaleDateString("en-US", {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="w-4 h-4 mr-2" />
-                    {new Date(`1970-01-01T${reg.event.startTime}:00`).toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true
-                    })} - {new Date(`1970-01-01T${reg.event.endTime}:00`).toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true
-                    })}
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 mr-2" />
-                    {reg.event.venue}
-                  </div>
-                  <div className="flex items-center">
-                    <Users className="w-4 h-4 mr-2" />
-                    Max {reg.event.max} players
-                  </div>
-                </div>
+          <>
+            {viewMode === 'calendar' ? (
+              renderCalendarView()
+            ) : (
+              <div className="space-y-4">
+                {registrations.map((reg) => (
+                  <Card key={`${reg.event.id}-${reg.regId}`} className="p-4 md:p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-800">{reg.event.venue}</h3>
+                        {isUpcomingEvent(reg.event.date) && (
+                          <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full mt-1">
+                            Upcoming
+                          </span>
+                        )}
+                        {isPastEvent(reg.event.date) && (
+                          <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full mt-1">
+                            Past Event
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 text-sm text-gray-600 mb-4">
+                      <div className="flex items-center">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        {new Date(reg.event.date).toLocaleDateString("en-US", {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </div>
+                      <div className="flex items-center">
+                        <Clock className="w-4 h-4 mr-2" />
+                        {new Date(`1970-01-01T${reg.event.startTime}:00`).toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true
+                        })} - {new Date(`1970-01-01T${reg.event.endTime}:00`).toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true
+                        })}
+                      </div>
+                      <div className="flex items-center">
+                        <MapPin className="w-4 h-4 mr-2" />
+                        {reg.event.venue}
+                      </div>
+                      <div className="flex items-center">
+                        <Users className="w-4 h-4 mr-2" />
+                        Max {reg.event.max} players
+                      </div>
+                    </div>
 
-                <div className="pt-4 border-t">
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    onClick={() => window.open(generateEventLink(reg.event), '_blank')}
-                    className="w-full"
-                  >
-                    View Event Details
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
+                    <div className="pt-4 border-t">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => window.open(generateEventLink(reg.event), '_blank')}
+                        className="w-full"
+                      >
+                        View Event Details
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

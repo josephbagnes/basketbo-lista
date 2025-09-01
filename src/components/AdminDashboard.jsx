@@ -13,7 +13,13 @@ import {
   Eye,
   LogOut,
   Settings,
-  ExternalLink
+  ExternalLink,
+  Home,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  Menu,
+  X
 } from "lucide-react";
 import { db } from "@/firebase";
 import { 
@@ -50,6 +56,9 @@ const AdminDashboard = () => {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [error, setError] = useState("");
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
+  const [currentCalendarMonth, setCurrentCalendarMonth] = useState(new Date());
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [settingsForm, setSettingsForm] = useState({
     groupName: "",
     coAdmins: []
@@ -395,6 +404,124 @@ const AdminDashboard = () => {
     window.open(link, '_blank');
   };
 
+  // Calendar helper functions
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  const getEventsForDate = (date) => {
+    // Format date as YYYY-MM-DD in local timezone to avoid UTC conversion issues
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    const eventsForDay = events.filter(event => event.date === dateStr);
+    return eventsForDay;
+  };
+
+  const navigateMonth = (direction) => {
+    setCurrentCalendarMonth(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() + direction);
+      return newDate;
+    });
+  };
+
+  const goToToday = () => {
+    setCurrentCalendarMonth(new Date());
+  };
+
+  const renderCalendarView = () => {
+    const daysInMonth = getDaysInMonth(currentCalendarMonth);
+    const firstDay = getFirstDayOfMonth(currentCalendarMonth);
+    const monthName = currentCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    const days = [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    // Empty cells for days before the first day of the month
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="h-24 md:h-32"></div>);
+    }
+    
+    // Days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      // Create date in local timezone to avoid timezone shift issues
+      const date = new Date(currentCalendarMonth.getFullYear(), currentCalendarMonth.getMonth(), day);
+      const eventsForDay = getEventsForDate(date);
+      const isToday = date.toDateString() === new Date().toDateString();
+      
+      days.push(
+        <div key={day} className={`h-24 md:h-32 border border-gray-200 p-1 md:p-2 overflow-hidden ${isToday ? 'bg-blue-50 border-blue-300' : 'bg-white'}`}>
+          <div className={`text-sm md:text-base font-medium mb-1 ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+            {day}
+          </div>
+          <div className="space-y-1">
+            {eventsForDay.slice(0, 2).map((event, index) => (
+              <div 
+                key={index}
+                className="text-xs bg-green-100 text-green-800 p-1 rounded cursor-pointer hover:bg-green-200 transition-colors"
+                onClick={() => redirectToEvent(event)}
+                title={`${event.venue} - ${event.startTime}`}
+              >
+                <div className="font-medium truncate">{event.venue}</div>
+                <div className="truncate">
+                  {new Date(`1970-01-01T${event.startTime}:00`).toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true
+                  })}
+                </div>
+              </div>
+            ))}
+            {eventsForDay.length > 2 && (
+              <div className="text-xs text-gray-500">+{eventsForDay.length - 2} more</div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <Card className="p-4 md:p-6">
+        {/* Calendar Header */}
+        <div className="flex items-center justify-between mb-6">
+          <Button variant="outline" size="sm" onClick={() => navigateMonth(-1)}>
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <div className="flex items-center space-x-2">
+            <h3 className="text-lg md:text-xl font-semibold">{monthName}</h3>
+            <Button variant="outline" size="xs" onClick={goToToday} title="Go to current month">
+              Today
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigateMonth(1)}>
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        {/* Day Names */}
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {dayNames.map(dayName => (
+            <div key={dayName} className="text-center text-sm font-medium text-gray-500 py-2">
+              {dayName}
+            </div>
+          ))}
+        </div>
+        
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7 gap-1">
+          {days}
+        </div>
+      </Card>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
@@ -483,7 +610,8 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between bg-white rounded-lg shadow-sm p-6 mb-8">
+        {/* Desktop Header */}
+        <div className="hidden md:flex items-center justify-between bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-center">
             <img src={blIcon} className="w-10 h-10 mr-4" alt="Basketball Logo" />
             <div>
@@ -550,6 +678,10 @@ const AdminDashboard = () => {
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </Button>
+            <Button variant="outline" size="sm" onClick={() => window.location.href = '/'}>
+              <Home className="w-4 h-4 mr-2" />
+              Home
+            </Button>
             <Button variant="outline" size="sm" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
@@ -557,137 +689,322 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Events</p>
-                <p className="text-2xl font-bold text-gray-900">{events.length}</p>
+        {/* Mobile Header */}
+        <div className="md:hidden mb-8">
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <img src={blIcon} className="w-10 h-10 mr-4" alt="Basketball Logo" />
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-800">{currentGroup.name} | Admin</h1>
+                  <p className="text-gray-600">ID: {currentGroup.groupId}</p>
+                </div>
               </div>
-              <Calendar className="w-8 h-8 text-blue-500" />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="p-2"
+              >
+                {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </Button>
+            </div>
+          </div>
+          
+          {/* Mobile Menu Dropdown */}
+          {showMobileMenu && (
+            <Card className="p-4 mb-4">
+              <div className="grid grid-cols-1 gap-3">
+                {userGroups.length > 1 ? (
+                  <div className="relative">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setShowGroupSwitcher(!showGroupSwitcher)}
+                      className="w-full"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Switch Group ({userGroups.length})
+                    </Button>
+                    {showGroupSwitcher && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg border z-50">
+                        <div className="p-2">
+                          <h3 className="text-sm font-semibold text-gray-700 mb-2">Your Groups</h3>
+                          {userGroups.map((group) => (
+                            <button
+                              key={group.id}
+                              onClick={() => handleSwitchGroup(group)}
+                              className={`w-full text-left p-2 rounded text-sm hover:bg-gray-50 ${
+                                currentGroup.id === group.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                              }`}
+                            >
+                              <div className="font-medium">{group.name}</div>
+                              <div className="text-xs text-gray-500">
+                                {group.role === 'admin' ? 'Admin' : 'Co-Admin'} • ID: {group.groupId}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="border-t p-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => window.location.href = '/signup'}
+                            className="w-full"
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create New Group
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => window.location.href = '/signup'}
+                    className="w-full"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create New Group
+                  </Button>
+                )}
+                
+                <Button variant="outline" size="sm" onClick={handleOpenSettings} className="w-full">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Button>
+                
+                <Button variant="outline" size="sm" onClick={() => window.location.href = '/'} className="w-full">
+                  <Home className="w-4 h-4 mr-2" />
+                  Home
+                </Button>
+                
+                <Button variant="outline" size="sm" onClick={handleSignOut} className="w-full">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+          <Card className="p-4 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+              <div className="text-center md:text-left">
+                <p className="text-xs md:text-sm font-medium text-gray-600">Total Events</p>
+                <p className="text-xl md:text-2xl font-bold text-gray-900">{events.length}</p>
+              </div>
+              <Calendar className="w-6 h-6 md:w-8 md:h-8 text-blue-500 mx-auto md:mx-0 mt-2 md:mt-0" />
             </div>
           </Card>
           
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active Events</p>
-                <p className="text-2xl font-bold text-gray-900">
+          <Card className="p-4 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+              <div className="text-center md:text-left">
+                <p className="text-xs md:text-sm font-medium text-gray-600">Active Events</p>
+                <p className="text-xl md:text-2xl font-bold text-gray-900">
                   {events.filter(e => e.isOpenForRegistration).length}
                 </p>
               </div>
-              <Users className="w-8 h-8 text-green-500" />
+              <Users className="w-6 h-6 md:w-8 md:h-8 text-green-500 mx-auto md:mx-0 mt-2 md:mt-0" />
             </div>
           </Card>
           
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">This Month</p>
-                <p className="text-2xl font-bold text-gray-900">
+          <Card className="p-4 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+              <div className="text-center md:text-left">
+                <p className="text-xs md:text-sm font-medium text-gray-600">This Month</p>
+                <p className="text-xl md:text-2xl font-bold text-gray-900">
                   {events.filter(e => new Date(e.date).getMonth() === new Date().getMonth()).length}
                 </p>
               </div>
-              <Clock className="w-8 h-8 text-orange-500" />
+              <Clock className="w-6 h-6 md:w-8 md:h-8 text-orange-500 mx-auto md:mx-0 mt-2 md:mt-0" />
             </div>
           </Card>
           
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Group ID</p>
-                <p className="text-lg font-bold text-gray-900">{currentGroup.groupId}</p>
+          <Card className="p-4 md:p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+              <div className="text-center md:text-left">
+                <p className="text-xs md:text-sm font-medium text-gray-600">Group ID</p>
+                <p className="text-sm md:text-lg font-bold text-gray-900 break-all">{currentGroup.groupId}</p>
               </div>
-              <MapPin className="w-8 h-8 text-purple-500" />
+              <MapPin className="w-6 h-6 md:w-8 md:h-8 text-purple-500 mx-auto md:mx-0 mt-2 md:mt-0" />
             </div>
           </Card>
         </div>
 
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-800">Events</h2>
-          <Button onClick={handleCreateEvent} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Event
-          </Button>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+          <div className="flex items-center space-x-2">
+            <Button 
+              variant={viewMode === 'list' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="sm:flex-none"
+            >
+              <List />
+            </Button>
+            <Button 
+              variant={viewMode === 'calendar' ? 'default' : 'outline'} 
+              size="sm"
+              onClick={() => setViewMode('calendar')}
+              className="sm:flex-none"
+            >
+              <Calendar />
+            </Button>
+            <Button size="sm" onClick={handleCreateEvent} className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none">
+              <Plus />
+              Create Event
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-4">
-          {events.length === 0 ? (
-            <Card className="p-8 text-center">
-              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">No events yet</h3>
-              <p className="text-gray-500 mb-4">Create your first basketball event to get started.</p>
-              <Button onClick={handleCreateEvent}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create First Event
-              </Button>
-            </Card>
-          ) : (
-            events.map((event) => (
-              <Card key={event.id} className="p-6">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center mb-2">
-                      <h3 className="text-lg font-semibold text-gray-800 mr-3">{event.venue}</h3>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        event.isOpenForRegistration 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {event.isOpenForRegistration ? 'Open' : 'Closed'}
-                      </span>
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
-                      <div>
+        {events.length === 0 ? (
+          <Card className="p-8 text-center">
+            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-600 mb-2">No events yet</h3>
+            <p className="text-gray-500 mb-4">Create your first basketball event to get started.</p>
+            <Button onClick={handleCreateEvent}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create First Event
+            </Button>
+          </Card>
+        ) : (
+          <>
+            {viewMode === 'calendar' ? (
+              renderCalendarView()
+            ) : (
+              <div className="grid gap-4">
+                {events.map((event) => (
+                  <Card key={event.id} className="p-4 md:p-6">
+                    {/* Mobile Layout */}
+                    <div className="md:hidden">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-semibold text-gray-800 flex-1 mr-2">{event.venue}</h3>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          event.isOpenForRegistration 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {event.isOpenForRegistration ? 'Open' : 'Closed'}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2 text-sm text-gray-600 mb-4">
                         <p><strong>Date:</strong> {new Date(event.date).toLocaleDateString()}</p>
                         <p><strong>Time:</strong> {event.startTime} - {event.endTime}</p>
-                      </div>
-                      <div>
                         <p><strong>Max Players:</strong> {event.max}</p>
                         <p><strong>Pay To:</strong> {event.pay_to}</p>
                       </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => copyEventLink(event)}
+                          className="text-xs"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Copy
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => redirectToEvent(event)}
+                          className="text-xs"
+                        >
+                          <ExternalLink className="w-4 h-4 mr-1" />
+                          View
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleEditEvent(event)}
+                          className="text-xs"
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleDeleteEvent(event.id)}
+                          className="text-xs hover:bg-red-50 hover:border-red-200"
+                        >
+                          <Trash className="w-4 h-4 mr-1 text-red-500" />
+                          Delete
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex space-x-2 ml-4">
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => copyEventLink(event)}
-                      title="Copy Event Link"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => redirectToEvent(event)}
-                      title="Go to Event Page"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleEditEvent(event)}
-                      title="Edit Event"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => handleDeleteEvent(event.id)}
-                      className="hover:bg-red-50 hover:border-red-200"
-                      title="Delete Event"
-                    >
-                      <Trash className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))
-          )}
-        </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden md:flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center mb-2">
+                          <h3 className="text-lg font-semibold text-gray-800 mr-3">{event.venue}</h3>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            event.isOpenForRegistration 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {event.isOpenForRegistration ? 'Open' : 'Closed'}
+                          </span>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
+                          <div>
+                            <p><strong>Date:</strong> {new Date(event.date).toLocaleDateString()}</p>
+                            <p><strong>Time:</strong> {event.startTime} - {event.endTime}</p>
+                          </div>
+                          <div>
+                            <p><strong>Max Players:</strong> {event.max}</p>
+                            <p><strong>Pay To:</strong> {event.pay_to}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2 ml-4">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => copyEventLink(event)}
+                          title="Copy Event Link"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => redirectToEvent(event)}
+                          title="Go to Event Page"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleEditEvent(event)}
+                          title="Edit Event"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleDeleteEvent(event.id)}
+                          className="hover:bg-red-50 hover:border-red-200"
+                          title="Delete Event"
+                        >
+                          <Trash className="w-4 h-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
+        )}
 
         {showEventModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
