@@ -10,18 +10,20 @@ export function Input({ className = "", type = "text", checked, label, ...props 
         "label", 
         { className: "inline-flex items-center" },
         React.createElement("input", {
-          className: "border p-2 rounded-xl mr-2 ",
+          className: "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-2",
           type: "checkbox",
           checked: checked,
           ...props
         }),
-        label
+        React.createElement("span", { className: "text-sm text-gray-700" }, label)
       )
     );
   }
 
+  const baseClasses = "block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200";
+
   return React.createElement("input", {
-    className: `border p-2 rounded-xl ${className}`,
+    className: `${baseClasses} ${className}`,
     type: type,
     ...props,
   });
