@@ -39,6 +39,7 @@ const ListingApp = () => {
   const [user, setUser] = useState(null);
   const [registrationMethod, setRegistrationMethod] = useState("pin"); // "pin" or "oauth"
   const [authLoading, setAuthLoading] = useState(false);
+  const [groupName, setGroupName] = useState("");
 
   const auth = getAuth();
 
@@ -160,6 +161,22 @@ const ListingApp = () => {
         setRegistrations(regData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
         const dateDetails = dates.find((date) => date.id === selectedDate);
         setSelectedDateDetails(dateDetails);
+        
+        // Fetch group name if we have groupId
+        if (dateDetails?.groupId) {
+          try {
+            const groupsSnapshot = await getDocs(collection(db, "groups"));
+            const groupData = groupsSnapshot.docs
+                              .filter(doc => doc.data().groupId === dateDetails.groupId)
+                              .map(doc => doc.data())[0];
+            setGroupName(groupData?.name || '');
+          } catch (error) {
+            console.error("Error fetching group name:", error);
+            setGroupName('');
+          }
+        } else {
+          setGroupName('');
+        }
       };
       fetchRegistrations();
     }
@@ -527,7 +544,7 @@ END:VCALENDAR`;
     if (selectedDateDetails) {
       const text = `Link: ${window.location.href}
       
-Date: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
+${groupName ? `Group: ${groupName}\n` : ''}Date: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
         year: "numeric",
         month: "short",
         day: "numeric",
@@ -578,6 +595,9 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
       {selectedDateDetails && (
         <Card className="mb-4 p-4 md:p-6">
           <div className="space-y-2 md:space-y-3 mb-4 text-sm md:text-base">
+            {groupName && (
+              <p><strong>Group:</strong> {groupName}</p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
               <p><strong>Date:</strong> {new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
         year: "numeric",

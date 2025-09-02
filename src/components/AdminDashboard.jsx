@@ -615,7 +615,7 @@ const AdminDashboard = () => {
           <div className="flex items-center">
             <img src={blIcon} className="w-10 h-10 mr-4" alt="Basketball Logo" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">{currentGroup.name} | Admin</h1>
+              <h1 className="text-2xl font-bold text-gray-800">{currentGroup.name}</h1>
               <p className="text-gray-600">ID: {currentGroup.groupId}</p>
             </div>
           </div>
@@ -696,7 +696,7 @@ const AdminDashboard = () => {
               <div className="flex items-center">
                 <img src={blIcon} className="w-10 h-10 mr-4" alt="Basketball Logo" />
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-800">{currentGroup.name} | Admin</h1>
+                  <h2 className="text-2xl font-bold text-gray-800">{currentGroup.name}</h2>
                   <p className="text-gray-600">ID: {currentGroup.groupId}</p>
                 </div>
               </div>
