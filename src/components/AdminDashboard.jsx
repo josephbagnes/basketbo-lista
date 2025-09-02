@@ -1172,13 +1172,6 @@ const AdminDashboard = () => {
                     </p>
                   </div>
                   
-                  <div className="bg-blue-50 p-3 rounded-lg">
-                    <p className="text-xs text-blue-700">
-                      <strong>Group ID:</strong> {currentGroup?.groupId}
-                    </p>
-                    <p className="text-xs text-blue-600 mt-1">Share this ID with other admins who need access to your group</p>
-                  </div>
-                  
                   <div className="flex justify-end space-x-3 pt-4">
                     <Button 
                       type="button" 
