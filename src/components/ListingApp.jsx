@@ -571,7 +571,14 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
     }
   };
 
-  const isPastDate = (date) => new Date(date) < new Date();
+  const isPastDate = (date) => {
+    const eventDate = new Date(date);
+    const today = new Date();
+    // Set time to start of day for comparison
+    eventDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    return eventDate < today;
+  };
 
   return (
     <div className="p-2 md:p-4">
