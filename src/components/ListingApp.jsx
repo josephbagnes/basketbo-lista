@@ -584,7 +584,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
     <div className="p-2 md:p-4">
       <div className="flex items-center justify-between bg-blue-200 text-gray py-3 md:py-4 px-4 md:px-6 mb-4 rounded-md shadow-md">
         <div className="flex justify-start">
-          <img src={blIcon} className="w-6 md:w-8 mr-2" />
+          <img src={blIcon} className="w-8 md:w-8 mr-2" />
           <h1 className="text-lg md:text-xl font-semibold">basketbo-lista</h1>
         </div>
         <div className="flex justify-end space-x-1 md:space-x-2">
