@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Copy, CalendarArrowDown, Trash, Home, User, LogOut } from "lucide-react";
+import { Copy, Trash, Home, User, LogOut } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,12 @@ const ListingApp = () => {
     setName(localStorage.getItem("myRegName") || "");
     setRegPin(localStorage.getItem("myRegPin") || "");
     setRegEmail(localStorage.getItem("myRegEmail") || "");
+
+    // Restore user's preferred registration method
+    const savedMethod = localStorage.getItem("myRegMethod");
+    if (savedMethod === "pin" || savedMethod === "oauth") {
+      setRegistrationMethod(savedMethod);
+    }
   }, [dates]);
 
   useEffect(() => {
@@ -118,6 +124,7 @@ const ListingApp = () => {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       setRegistrationMethod("oauth");
+      localStorage.setItem("myRegMethod", "oauth");
     } catch (error) {
       console.error("Google sign-in error:", error);
       alert("Failed to sign in with Google. Please try again.");
@@ -147,6 +154,7 @@ const ListingApp = () => {
       setName("");
       setRegEmail("");
       setRegistrationMethod("pin");
+      localStorage.setItem("myRegMethod", "pin");
     } catch (error) {
       console.error("Error signing out:", error);
     }
@@ -646,23 +654,29 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             <div className="mb-4">
               <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4 mb-3">
                 <label className="flex items-center">
-                  <input 
-                    type="radio" 
-                    name="registrationMethod" 
-                    value="pin" 
+                  <input
+                    type="radio"
+                    name="registrationMethod"
+                    value="pin"
                     checked={registrationMethod === "pin"}
-                    onChange={(e) => setRegistrationMethod(e.target.value)}
+                    onChange={(e) => {
+                      setRegistrationMethod(e.target.value);
+                      localStorage.setItem("myRegMethod", e.target.value);
+                    }}
                     className="mr-2"
                   />
                   <span className="text-sm">Register with PIN & Email</span>
                 </label>
                 <label className="flex items-center">
-                  <input 
-                    type="radio" 
-                    name="registrationMethod" 
-                    value="oauth" 
+                  <input
+                    type="radio"
+                    name="registrationMethod"
+                    value="oauth"
                     checked={registrationMethod === "oauth"}
-                    onChange={(e) => setRegistrationMethod(e.target.value)}
+                    onChange={(e) => {
+                      setRegistrationMethod(e.target.value);
+                      localStorage.setItem("myRegMethod", e.target.value);
+                    }}
                     className="mr-2"
                   />
                   <span className="text-sm">Sign in with Google</span>
