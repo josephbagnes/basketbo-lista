@@ -41,7 +41,10 @@ const UserDashboard = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+      // firebase.js auto-signs everyone into an anonymous session just to
+      // satisfy Firestore rules. That must not be mistaken for a real
+      // Google sign-in here.
+      if (user && !user.isAnonymous) {
         setUser(user);
         await loadUserRegistrations(user.uid, user.email);
         setShowLoginModal(false);

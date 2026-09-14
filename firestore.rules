@@ -2,8 +2,60 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    function isSignedIn() {
+      // Google sign-in or the anonymous fallback in firebase.js — either way,
+      // a real Firebase Auth session, not a bare unauthenticated client. This
+      // blocks anyone hitting Firestore directly without going through
+      // Firebase Auth at all, but it is NOT per-user authorization by itself.
+      return request.auth != null;
+    }
+
+    function isGoogleUser() {
+      // True only for a real Google sign-in, never for the anonymous
+      // fallback (anonymous sign-in is free and instant, so it can't be used
+      // to prove anything about who's asking).
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    // Group documents (name, adminEmail, coAdmins, public groupId code).
+    // Nothing here is secret — any signed-in session (including anonymous)
+    // can read/write. Real per-group ownership (only the admin/co-admins can
+    // edit *their* group) isn't enforced here yet; the app only shows the
+    // option in the UI to a matching admin. Known gap, not addressed by this
+    // change.
+    match /groups/{groupId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /dates/{dateId} {
+      // Event details (date, venue, times, whether Google sign-in is
+      // required, etc.) aren't secret — they're meant to be visible via a
+      // shared link — so any signed-in session can read/write. As with
+      // groups, real per-event ownership isn't enforced here yet.
+      allow read, write: if isSignedIn();
+
+      match /registrations/{regId} {
+        // Registrations hold PINs and emails — this is the collection that
+        // actually needs protecting. When the parent event has
+        // requireGoogleLogin set, only a *real* Google sign-in can read or
+        // write here. This is what makes "force Google login" on the
+        // listing page an actual guarantee instead of a client-side check:
+        // an anonymous read/write attempt is denied by Firestore itself.
+        function eventRequiresGoogle() {
+          return get(/databases/$(database)/documents/dates/$(dateId)).data.requireGoogleLogin == true;
+        }
+        allow read, write: if isSignedIn() && (!eventRequiresGoogle() || isGoogleUser());
+      }
+    }
+
+    // Mail is only ever written by the app (consumed by a Trigger Email
+    // extension) and never read back by any client code, so deny read
+    // entirely.
+    match /mail/{mailId} {
+      allow write: if isSignedIn();
+      allow read: if false;
     }
   }
 }

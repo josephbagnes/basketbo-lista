@@ -70,14 +70,18 @@ const AdminDashboard = () => {
     payTo: "",
     startTime: "",
     endTime: "",
-    isOpenForRegistration: true
+    isOpenForRegistration: true,
+    requireGoogleLogin: false
   });
 
   const auth = getAuth();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+      // firebase.js auto-signs everyone into an anonymous session just to
+      // satisfy Firestore rules. That must not be mistaken for a real
+      // Google sign-in here.
+      if (user && !user.isAnonymous) {
         setUser(user);
         await loadUserGroups(user.email);
       } else {
@@ -315,7 +319,8 @@ const AdminDashboard = () => {
       payTo: "",
       startTime: "",
       endTime: "",
-      isOpenForRegistration: true
+      isOpenForRegistration: true,
+      requireGoogleLogin: false
     });
     setShowEventModal(true);
   };
@@ -329,7 +334,8 @@ const AdminDashboard = () => {
       payTo: event.pay_to,
       startTime: event.startTime,
       endTime: event.endTime,
-      isOpenForRegistration: event.isOpenForRegistration || false
+      isOpenForRegistration: event.isOpenForRegistration || false,
+      requireGoogleLogin: event.requireGoogleLogin || false
     });
     setShowEventModal(true);
   };
@@ -348,6 +354,11 @@ const AdminDashboard = () => {
         startTime: eventFormData.startTime,
         endTime: eventFormData.endTime,
         isOpenForRegistration: eventFormData.isOpenForRegistration,
+        requireGoogleLogin: eventFormData.requireGoogleLogin,
+        // Only newly-created events get opaque/hash-style links. Events
+        // created before this feature existed keep resolving via their
+        // original cleartext link, so we never flip this on for an edit.
+        useOpaqueLink: editingEvent ? (editingEvent.useOpaqueLink ?? false) : true,
         groupId: currentGroup.groupId,
         createdBy: currentGroup.adminEmail,
         createdAt: new Date().toISOString()
@@ -385,11 +396,19 @@ const AdminDashboard = () => {
   const generateEventLink = (event) => {
     const url = new URL(window.location.origin);
     url.pathname = '/events';
-    url.searchParams.set("groupId", event.groupId);
-    url.searchParams.set("date", event.date);
-    url.searchParams.set("venue", event.venue);
-    url.searchParams.set("startTime", event.startTime);
-    url.searchParams.set("endTime", event.endTime);
+    if (event.useOpaqueLink) {
+      // New-style link: the event's own Firestore document ID as an opaque
+      // token. Reveals nothing about the event and can't be used to
+      // enumerate the rest of the group.
+      url.searchParams.set("id", event.id);
+    } else {
+      // Legacy link, kept for events created before this feature existed.
+      url.searchParams.set("groupId", event.groupId);
+      url.searchParams.set("date", event.date);
+      url.searchParams.set("venue", event.venue);
+      url.searchParams.set("startTime", event.startTime);
+      url.searchParams.set("endTime", event.endTime);
+    }
     return url.toString();
   };
 
@@ -884,24 +903,24 @@ const AdminDashboard = () => {
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-lg font-semibold text-gray-800 flex-1 mr-2">{event.venue}</h3>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          event.isOpenForRegistration 
-                            ? 'bg-green-100 text-green-800' 
+                          event.isOpenForRegistration
+                            ? 'bg-green-100 text-green-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}>
                           {event.isOpenForRegistration ? 'Open' : 'Closed'}
                         </span>
                       </div>
-                      
+
                       <div className="space-y-2 text-sm text-gray-600 mb-4">
                         <p><strong>Date:</strong> {new Date(event.date).toLocaleDateString()}</p>
                         <p><strong>Time:</strong> {event.startTime} - {event.endTime}</p>
                         <p><strong>Max Players:</strong> {event.max}</p>
                         <p><strong>Pay To:</strong> {event.pay_to}</p>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-2">
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => copyEventLink(event)}
                           className="text-xs"
@@ -1096,6 +1115,25 @@ const AdminDashboard = () => {
                       Open for registration
                     </label>
                   </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="requireGoogleLogin"
+                      name="requireGoogleLogin"
+                      checked={eventFormData.requireGoogleLogin}
+                      onChange={handleEventFormChange}
+                      className="mr-2"
+                    />
+                    <label htmlFor="requireGoogleLogin" className="text-sm text-gray-700">
+                      Require Google sign-in to register
+                    </label>
+                  </div>
+                  {eventFormData.requireGoogleLogin && (
+                    <p className="text-xs text-gray-500 -mt-2">
+                      When enabled, players must sign in with Google to register. Admins/co-admins can still add multiple entries under different names; everyone else is limited to one registration per Google account.
+                    </p>
+                  )}
                   
                   <div className="flex justify-end space-x-3 pt-4">
                     <Button 

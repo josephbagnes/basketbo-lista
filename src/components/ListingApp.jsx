@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Copy, Trash, Home, User, LogOut } from "lucide-react";
+import { Copy, Trash, Home, User, LogOut, CalendarArrowDown } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,6 @@ import {
   updateDoc,
   query,
   where,
-  orderBy,
 } from "firebase/firestore";
 import { 
   getAuth, 
@@ -30,7 +29,6 @@ const ListingApp = () => {
   const [name, setName] = useState("");
   const [regPin, setRegPin] = useState("");
   const [regEmail, setRegEmail] = useState("");
-  const [dates, setDates] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
   const [registrations, setRegistrations] = useState([]);
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
@@ -40,45 +38,39 @@ const ListingApp = () => {
   const [registrationMethod, setRegistrationMethod] = useState("pin"); // "pin" or "oauth"
   const [authLoading, setAuthLoading] = useState(false);
   const [groupName, setGroupName] = useState("");
+  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
+  // Firestore reads now require a Firebase Auth session (Google or the
+  // anonymous fallback in firebase.js). Nothing that touches Firestore
+  // should fire until we know that session exists, or it'll race the
+  // anonymous sign-in and fail with permission-denied on a fresh visit.
+  const [authReady, setAuthReady] = useState(false);
 
   const auth = getAuth();
 
+  // Events can be configured to require Google sign-in. When that's on, the
+  // PIN method is disabled entirely and everyone registers via OAuth.
+  const requireGoogleLogin = selectedDateDetails?.requireGoogleLogin === true;
+  const effectiveMethod = requireGoogleLogin ? "oauth" : registrationMethod;
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
+      // firebase.js auto-signs everyone into an anonymous session just to
+      // satisfy Firestore rules. That must not be mistaken for a real
+      // Google sign-in anywhere the app checks `user`.
+      if (user && !user.isAnonymous) {
         setUser(user);
         setName(user.displayName || "");
         setRegEmail(user.email || "");
+      } else {
+        setUser(null);
       }
+      setAuthReady(true);
     });
 
     return () => unsubscribe();
   }, [auth]);
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const groupId = urlParams.get("groupId");
-    const date = urlParams.get("date");
-    const venue = urlParams.get("venue");
-    const startTime = urlParams.get("startTime");
-    const endTime = urlParams.get("endTime");
-
-    if (groupId && date && venue && startTime && endTime) {
-      const matchedEvent = dates.find(
-        (event) =>
-          event.groupId === groupId &&
-          event.date === date &&
-          event.venue === venue &&
-          event.startTime === startTime &&
-          event.endTime === endTime
-      );
-      if (matchedEvent) {
-        setSelectedDate(matchedEvent.id);
-        setSelectedDateDetails(matchedEvent);
-        setIsOpenForRegistration(matchedEvent.isOpenForRegistration ?? false);
-      }
-    }
-
     setName(localStorage.getItem("myRegName") || "");
     setRegPin(localStorage.getItem("myRegPin") || "");
     setRegEmail(localStorage.getItem("myRegEmail") || "");
@@ -88,35 +80,66 @@ const ListingApp = () => {
     if (savedMethod === "pin" || savedMethod === "oauth") {
       setRegistrationMethod(savedMethod);
     }
-  }, [dates]);
+  }, []);
 
   useEffect(() => {
-    const fetchDates = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const groupId = urlParams.get("groupId");
-      
-      let eventsQuery;
-      if (groupId) {
-        // If groupId is provided, only fetch events from that group
-        eventsQuery = query(
-          collection(db, "dates"), 
-          where("groupId", "==", groupId),
-          orderBy("date", "desc")
-        );
-      } else {
-        // If no groupId, fetch all events (backward compatibility)
-        eventsQuery = query(collection(db, "dates"), orderBy("date", "desc"));
+    // Reads now require a Firebase Auth session. Wait for the auth state to
+    // settle (real sign-in, or the anonymous fallback) before touching
+    // Firestore at all, otherwise a brand-new visitor can hit this before
+    // firebase.js's signInAnonymously() resolves and get permission-denied.
+    if (!authReady) return;
+
+    const resolveEvent = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const id = urlParams.get("id");
+
+        if (id) {
+          // New-style link: an opaque event ID, no event details or groupId
+          // exposed in the URL, and no other events in the group are fetched.
+          const eventSnap = await getDoc(doc(db, "dates", id));
+          if (eventSnap.exists()) {
+            const eventData = { id: eventSnap.id, ...eventSnap.data() };
+            setSelectedDate(eventData.id);
+            setSelectedDateDetails(eventData);
+            setIsOpenForRegistration(eventData.isOpenForRegistration ?? false);
+          }
+          return;
+        }
+
+        // Legacy links (groupId/date/venue/startTime/endTime in cleartext)
+        // are still honored so previously shared links keep working.
+        const groupId = urlParams.get("groupId");
+        const date = urlParams.get("date");
+        const venue = urlParams.get("venue");
+        const startTime = urlParams.get("startTime");
+        const endTime = urlParams.get("endTime");
+
+        if (!(groupId && date && venue && startTime && endTime)) return;
+
+        const eventsQuery = query(collection(db, "dates"), where("groupId", "==", groupId));
+        const querySnapshot = await getDocs(eventsQuery);
+        const matchedEvent = querySnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .find(
+            (event) =>
+              event.date === date &&
+              event.venue === venue &&
+              event.startTime === startTime &&
+              event.endTime === endTime
+          );
+
+        if (matchedEvent && !matchedEvent.useOpaqueLink) {
+          setSelectedDate(matchedEvent.id);
+          setSelectedDateDetails(matchedEvent);
+          setIsOpenForRegistration(matchedEvent.isOpenForRegistration ?? false);
+        }
+      } catch (error) {
+        console.error("Error loading event:", error);
       }
-      
-      const querySnapshot = await getDocs(eventsQuery);
-      const fetchedDates = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      
-      // Ensure events are sorted by latest date first (newest to oldest)
-      const sortedDates = fetchedDates.sort((a, b) => new Date(b.date) - new Date(a.date));
-      setDates(sortedDates);
     };
-    fetchDates();
-  }, []);
+    resolveEvent();
+  }, [authReady]);
 
   const handleGoogleSignIn = async () => {
     setAuthLoading(true);
@@ -161,34 +184,43 @@ const ListingApp = () => {
   };
 
   useEffect(() => {
-    if (selectedDate) {
-      const fetchRegistrations = async () => {
+    if (!authReady || !selectedDate) return;
+    const fetchRegistrations = async () => {
+      try {
         const docRef = doc(db, "dates", selectedDate);
         const regSnap = await getDocs(collection(docRef, "registrations"));
         const regData = regSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).filter((doc) => doc.id);
         setRegistrations(regData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-        const dateDetails = dates.find((date) => date.id === selectedDate);
-        setSelectedDateDetails(dateDetails);
-        
-        // Fetch group name if we have groupId
-        if (dateDetails?.groupId) {
-          try {
-            const groupsSnapshot = await getDocs(collection(db, "groups"));
-            const groupData = groupsSnapshot.docs
-                              .filter(doc => doc.data().groupId === dateDetails.groupId)
-                              .map(doc => doc.data())[0];
-            setGroupName(groupData?.name || '');
-          } catch (error) {
-            console.error("Error fetching group name:", error);
-            setGroupName('');
-          }
-        } else {
-          setGroupName('');
-        }
-      };
-      fetchRegistrations();
-    }
-  }, [selectedDate, dates]);
+      } catch (error) {
+        // If this event requires Google sign-in, registrations are
+        // unreadable to an anonymous session by design (see firestore.rules).
+        // This effect re-runs once `user` changes, so signing in retries it.
+        console.error("Error fetching registrations:", error);
+        setRegistrations([]);
+      }
+    };
+    fetchRegistrations();
+  }, [selectedDate, authReady, user]);
+
+  useEffect(() => {
+    const fetchGroupName = async () => {
+      if (!selectedDateDetails?.groupId) {
+        setGroupName('');
+        return;
+      }
+      try {
+        const groupsSnapshot = await getDocs(collection(db, "groups"));
+        const groupData = groupsSnapshot.docs
+                          .filter(doc => doc.data().groupId === selectedDateDetails.groupId)
+                          .map(doc => doc.data())[0];
+        setGroupName(groupData?.name || '');
+      } catch (error) {
+        console.error("Error fetching group name:", error);
+        setGroupName('');
+      }
+    };
+    fetchGroupName();
+  }, [selectedDateDetails?.groupId]);
 
   const sendEmail = async (subjectSuffix, regData, isCancellation) => {
     try{
@@ -337,7 +369,7 @@ END:VCALENDAR`;
     if(isSubmitting) return;
 
     // Validation for PIN method
-    if (registrationMethod === "pin") {
+    if (effectiveMethod === "pin") {
       if (!name || name.length < 1 || name.length > 20) {
         alert("Name is required and must be 1-20 chars");
         return;
@@ -351,7 +383,7 @@ END:VCALENDAR`;
         alert("Email format is invalid");
         return;
       }
-    } else if (registrationMethod === "oauth") {
+    } else if (effectiveMethod === "oauth") {
       // For OAuth, we need the user to be signed in
       if (!user) {
         alert("Please sign in first");
@@ -389,15 +421,28 @@ END:VCALENDAR`;
         return;
       }
 
+      // When an event requires Google sign-in, admins/co-admins may still
+      // add multiple entries under their own account, but everyone else is
+      // limited to a single registration per Google account.
+      if (requireGoogleLogin && effectiveMethod === "oauth" && !isGroupAdmin) {
+        const alreadyRegistered = fetchedRegistrations.some((reg) => (
+          reg.userUid === user.uid || (reg.email && reg.email === user.email)
+        ));
+        if (alreadyRegistered) {
+          alert("You have already registered for this event with this Google account.");
+          return;
+        }
+      }
+
       const newRegistration = {
         name,
         timestamp: new Date().toISOString(),
-        registrationMethod,
-        ...(registrationMethod === "pin" && { pin: regPin, email: regEmail }),
-        ...(registrationMethod === "oauth" && { 
-          userUid: user.uid, 
+        registrationMethod: effectiveMethod,
+        ...(effectiveMethod === "pin" && { pin: regPin, email: regEmail }),
+        ...(effectiveMethod === "oauth" && {
+          userUid: user.uid,
           email: user.email,
-          authProvider: user.providerData[0]?.providerId 
+          authProvider: user.providerData[0]?.providerId
         }),
       };
 
@@ -442,6 +487,23 @@ END:VCALENDAR`;
       return false;
     }
   };
+
+  // Keep track of whether the signed-in user is an admin/co-admin of the
+  // current event's group, so admins can register multiple names under one
+  // Google account while everyone else is limited to a single registration.
+  useEffect(() => {
+    let cancelled = false;
+    const checkAdmin = async () => {
+      if (user?.email && selectedDateDetails?.groupId) {
+        const result = await isUserAdminForGroup(user.email, selectedDateDetails.groupId);
+        if (!cancelled) setIsGroupAdmin(result);
+      } else {
+        setIsGroupAdmin(false);
+      }
+    };
+    checkAdmin();
+    return () => { cancelled = true; };
+  }, [user, selectedDateDetails]);
 
   const handleCancel = async (id, isWaitlist) => { 
     try {
@@ -651,41 +713,52 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             <h3 className="text-lg md:text-xl font-semibold mb-4 text-center md:text-left">Register for this Event</h3>
             
             {/* Registration Method Selection */}
-            <div className="mb-4">
-              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4 mb-3">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="registrationMethod"
-                    value="pin"
-                    checked={registrationMethod === "pin"}
-                    onChange={(e) => {
-                      setRegistrationMethod(e.target.value);
-                      localStorage.setItem("myRegMethod", e.target.value);
-                    }}
-                    className="mr-2"
-                  />
-                  <span className="text-sm">Register with PIN & Email</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="registrationMethod"
-                    value="oauth"
-                    checked={registrationMethod === "oauth"}
-                    onChange={(e) => {
-                      setRegistrationMethod(e.target.value);
-                      localStorage.setItem("myRegMethod", e.target.value);
-                    }}
-                    className="mr-2"
-                  />
-                  <span className="text-sm">Sign in with Google</span>
-                </label>
+            {requireGoogleLogin ? (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  This event requires signing in with Google to register.
+                  {isGroupAdmin
+                    ? " As an admin/co-admin, you can add multiple entries under different names."
+                    : " You may register once per Google account."}
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="mb-4">
+                <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4 mb-3">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="registrationMethod"
+                      value="pin"
+                      checked={registrationMethod === "pin"}
+                      onChange={(e) => {
+                        setRegistrationMethod(e.target.value);
+                        localStorage.setItem("myRegMethod", e.target.value);
+                      }}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Register with PIN & Email</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="registrationMethod"
+                      value="oauth"
+                      checked={registrationMethod === "oauth"}
+                      onChange={(e) => {
+                        setRegistrationMethod(e.target.value);
+                        localStorage.setItem("myRegMethod", e.target.value);
+                      }}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">Sign in with Google</span>
+                  </label>
+                </div>
+              </div>
+            )}
 
             {/* OAuth Sign-in Buttons */}
-            {registrationMethod === "oauth" && !user && (
+            {effectiveMethod === "oauth" && !user && (
               <div className="mb-4 space-y-2">
                 <Button 
                   onClick={handleGoogleSignIn}
@@ -717,7 +790,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             )}
 
             {/* User Info Display for OAuth */}
-            {registrationMethod === "oauth" && user && (
+            {effectiveMethod === "oauth" && user && (
               <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center">
                   <User className="w-4 h-4 text-green-600 mr-2" />
@@ -738,7 +811,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
                 />
               </div>
               
-              {registrationMethod === "pin" && (
+              {effectiveMethod === "pin" && (
                 <>
                   <div>
                     <label className="block text-xs text-gray-500 italic mb-1">* Set own PIN (4-10 chars) to protect your registration</label>
@@ -763,16 +836,16 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
               )}
             </div>
 
-            <Button 
-              onClick={handleRegister} 
-              size="md" 
-              className="text-md p-2 mt-4 rounded-xl w-full" 
-              disabled={isSubmitting || (registrationMethod === "oauth" && !user)}
+            <Button
+              onClick={handleRegister}
+              size="md"
+              className="text-md p-2 mt-4 rounded-xl w-full"
+              disabled={isSubmitting || (effectiveMethod === "oauth" && !user)}
             >
               {isSubmitting ? "Registering..." : "Register for Event"}
             </Button>
 
-            {registrationMethod === "oauth" && !user && (
+            {effectiveMethod === "oauth" && !user && (
               <p className="text-xs text-gray-500 mt-2 text-center">Please sign in first to register</p>
             )}
           </div>
@@ -836,14 +909,22 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
         </Card>
       )}
       
-      {!selectedDateDetails && (
+      {!authReady && (
+        <Card className="mb-4 p-6 md:p-8 text-center">
+          <p className="text-gray-600">Loading...</p>
+        </Card>
+      )}
+
+      {authReady && !selectedDateDetails && (
         <Card className="mb-4 p-6 md:p-8 text-center">
           <h2 className="text-lg md:text-xl font-semibold mb-3">No Event Selected</h2>
           <p className="text-gray-600 mb-4 text-sm md:text-base">
-            {new URLSearchParams(window.location.search).get("groupId") 
-              ? "Please select an event from a valid shared link from your league admin." 
-              : "Please select an event from a shared link or contact your league admin."
-            }
+            {(() => {
+              const params = new URLSearchParams(window.location.search);
+              return params.get("id") || params.get("groupId")
+                ? "Please select an event from a valid shared link from your league admin."
+                : "Please select an event from a shared link or contact your league admin.";
+            })()}
           </p>
           <Button onClick={() => window.location.href = '/'} className="w-full sm:w-auto">
             Go to Home Page
