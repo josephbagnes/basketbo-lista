@@ -44,6 +44,11 @@ const ListingApp = () => {
   // should fire until we know that session exists, or it'll race the
   // anonymous sign-in and fail with permission-denied on a fresh visit.
   const [authReady, setAuthReady] = useState(false);
+  // Resolving the event from the URL is itself an async Firestore call.
+  // Without this flag, the render briefly falls through to the "no event
+  // selected" state between authReady flipping true and resolveEvent
+  // actually finishing, before flashing to the real event.
+  const [eventLoading, setEventLoading] = useState(true);
 
   const auth = getAuth();
 
@@ -91,6 +96,7 @@ const ListingApp = () => {
 
     const resolveEvent = async () => {
       try {
+        setEventLoading(true);
         const urlParams = new URLSearchParams(window.location.search);
         const id = urlParams.get("id");
 
@@ -136,6 +142,8 @@ const ListingApp = () => {
         }
       } catch (error) {
         console.error("Error loading event:", error);
+      } finally {
+        setEventLoading(false);
       }
     };
     resolveEvent();
@@ -909,13 +917,13 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
         </Card>
       )}
       
-      {!authReady && (
+      {(!authReady || eventLoading) && (
         <Card className="mb-4 p-6 md:p-8 text-center">
           <p className="text-gray-600">Loading...</p>
         </Card>
       )}
 
-      {authReady && !selectedDateDetails && (
+      {authReady && !eventLoading && !selectedDateDetails && (
         <Card className="mb-4 p-6 md:p-8 text-center">
           <h2 className="text-lg md:text-xl font-semibold mb-3">No Event Selected</h2>
           <p className="text-gray-600 mb-4 text-sm md:text-base">
