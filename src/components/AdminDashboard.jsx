@@ -42,6 +42,7 @@ import {
   signOut
 } from "firebase/auth";
 import blIcon from "@/assets/blIcon.png";
+import { isHeatcheckEnabled, isHeatcheckLink } from "@/heatcheck";
 
 const AdminDashboard = () => {
   const [user, setUser] = useState(null);
@@ -71,7 +72,8 @@ const AdminDashboard = () => {
     startTime: "",
     endTime: "",
     isOpenForRegistration: true,
-    requireGoogleLogin: false
+    requireGoogleLogin: false,
+    heatcheckUrl: ""
   });
 
   const auth = getAuth();
@@ -320,7 +322,8 @@ const AdminDashboard = () => {
       startTime: "",
       endTime: "",
       isOpenForRegistration: true,
-      requireGoogleLogin: false
+      requireGoogleLogin: false,
+      heatcheckUrl: ""
     });
     setShowEventModal(true);
   };
@@ -335,7 +338,8 @@ const AdminDashboard = () => {
       startTime: event.startTime,
       endTime: event.endTime,
       isOpenForRegistration: event.isOpenForRegistration || false,
-      requireGoogleLogin: event.requireGoogleLogin || false
+      requireGoogleLogin: event.requireGoogleLogin || false,
+      heatcheckUrl: event.heatcheckUrl || ""
     });
     setShowEventModal(true);
   };
@@ -344,6 +348,12 @@ const AdminDashboard = () => {
     e.preventDefault();
     
     if (!currentGroup) return;
+
+    const heatcheckUrl = eventFormData.heatcheckUrl.trim();
+    if (heatcheckUrl && !isHeatcheckLink(heatcheckUrl)) {
+      alert(`HeatCheck link must be on ${import.meta.env.VITE_HEATCHECK_ORIGIN}`);
+      return;
+    }
 
     try {
       const eventData = {
@@ -355,6 +365,7 @@ const AdminDashboard = () => {
         endTime: eventFormData.endTime,
         isOpenForRegistration: eventFormData.isOpenForRegistration,
         requireGoogleLogin: eventFormData.requireGoogleLogin,
+        heatcheckUrl,
         // Only newly-created events get opaque/hash-style links. Events
         // created before this feature existed keep resolving via their
         // original cleartext link, so we never flip this on for an edit.
@@ -1133,6 +1144,21 @@ const AdminDashboard = () => {
                     <p className="text-xs text-gray-500 -mt-2">
                       When enabled, players must sign in with Google to register. Admins/co-admins can still add multiple entries under different names; everyone else is limited to one registration per Google account.
                     </p>
+                  )}
+
+                  {isHeatcheckEnabled && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">HeatCheck Stats Link (optional)</label>
+                      <Input
+                        name="heatcheckUrl"
+                        value={eventFormData.heatcheckUrl}
+                        onChange={handleEventFormChange}
+                        placeholder={`${import.meta.env.VITE_HEATCHECK_ORIGIN}/...`}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Registered players signed in with Google get a "My Stats" button that opens this link already signed in to HeatCheck.
+                      </p>
+                    </div>
                   )}
                   
                   <div className="flex justify-end space-x-3 pt-4">

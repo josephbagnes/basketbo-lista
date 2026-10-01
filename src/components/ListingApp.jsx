@@ -24,7 +24,7 @@ import {
   signOut 
 } from "firebase/auth";
 import blIcon from "@/assets/blIcon.png";
-import { isHeatcheckEnabled, openHeatcheckStats } from "@/heatcheck";
+import { isHeatcheckLink, openHeatcheckStats } from "@/heatcheck";
 
 const ListingApp = () => {
   const [name, setName] = useState("");
@@ -594,7 +594,7 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
               <CalendarArrowDown className="w-4 h-4 text-blue-500 mr-1" />
               <span className="hidden sm:inline">Calendar</span>
             </Button>
-            {isHeatcheckEnabled && user && registrations.some((reg) => reg.userUid === user.uid || (reg.email && reg.email === user.email)) && (
+            {isHeatcheckLink(selectedDateDetails.heatcheckUrl) && user && registrations.some((reg) => reg.userUid === user.uid || (reg.email && reg.email === user.email)) && (
               <Button onClick={() => openHeatcheckStats(user, selectedDateDetails)} size="sm" className="flex items-center text-xs md:text-sm bg-white px-3 py-2 rounded-lg border" title="View my stats on HeatCheck">
                 <BarChart3 className="w-4 h-4 text-blue-500 mr-1" />
                 <span className="hidden sm:inline">My Stats</span>

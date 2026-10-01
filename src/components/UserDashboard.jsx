@@ -26,7 +26,7 @@ import {
   signOut
 } from "firebase/auth";
 import blIcon from "@/assets/blIcon.png";
-import { isHeatcheckEnabled, openHeatcheckStats } from "@/heatcheck";
+import { isHeatcheckLink, openHeatcheckStats } from "@/heatcheck";
 
 const UserDashboard = () => {
   const [user, setUser] = useState(null);
@@ -490,7 +490,7 @@ const UserDashboard = () => {
                       >
                         View Event Details
                       </Button>
-                      {isHeatcheckEnabled && isPastEvent(reg.event.date) && (
+                      {isHeatcheckLink(reg.event.heatcheckUrl) && (
                         <Button
                           size="sm"
                           variant="outline"

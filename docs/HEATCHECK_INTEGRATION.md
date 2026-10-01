@@ -21,17 +21,24 @@ user ID (`sub`), falling back to the verified email address.
 
 ### What basketbo-lista sends
 
-basketbo-lista opens this URL in a new tab:
+The basketbo-lista event admin pastes the **HeatCheck stats link for that
+game** into the event. Registered players signed in with Google then get a
+"My Stats" button, which opens that link in a new tab with two additions:
 
 ```
-<HEATCHECK_URL>?source=basketbo-lista&eventId=<id>#blToken=<Firebase ID token>
+<HeatCheck stats link>?source=basketbo-lista#blToken=<Firebase ID token>
 ```
 
 | Part | Meaning |
 |---|---|
-| `<HEATCHECK_URL>` | The HeatCheck page you give us (see "What we need from HeatCheck") |
-| `eventId` | basketbo-lista event ID (stable, opaque). HeatCheck should store it with the game so it can look up the stats. |
+| `<HeatCheck stats link>` | Exactly the link the admin pasted, e.g. `https://heatcheck.app/games/42`. Any existing query parameters are kept. It must be on HeatCheck's origin; basketbo-lista refuses to attach a token to any other site. |
+| `source` | Always `basketbo-lista` |
 | `blToken` | Firebase ID token (RS256 JWT) issued by the `basketbo-lista` Firebase project. Valid for up to 1 hour. |
+
+So HeatCheck doesn't need to know basketbo-lista's event IDs. HeatCheck only
+needs a shareable stats page per game that admins can copy, and every such
+page must handle `#blToken` (simplest: handle it once in the app shell /
+layout for every route).
 
 ### What HeatCheck needs to implement
 
@@ -143,4 +150,5 @@ basketbo-lista's normal sign-in.
 1. **Supabase project URL**, e.g. `https://abcdefgh.supabase.co`.
 2. **Supabase anon / publishable key.** This is the public key already in
    HeatCheck's frontend. **Not** the service-role key.
-3. **The HeatCheck URL** that should receive "My Stats" links (section 1).
+3. **HeatCheck's site origin**, e.g. `https://heatcheck.app`. Only links on
+   this origin can be pasted into events and opened with a token.
