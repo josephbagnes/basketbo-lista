@@ -1206,7 +1206,7 @@ const AdminDashboard = () => {
                       </Button>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
-                      Co-admins can manage events and settings for this group. They will receive notifications for registrations and cancellations.
+                      Co-admins can manage events and settings for this group.
                     </p>
                   </div>
                   

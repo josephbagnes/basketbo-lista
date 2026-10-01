@@ -49,13 +49,5 @@ service cloud.firestore {
         allow read, write: if isSignedIn() && (!eventRequiresGoogle() || isGoogleUser());
       }
     }
-
-    // Mail is only ever written by the app (consumed by a Trigger Email
-    // extension) and never read back by any client code, so deny read
-    // entirely.
-    match /mail/{mailId} {
-      allow write: if isSignedIn();
-      allow read: if false;
-    }
   }
 }

@@ -230,120 +230,6 @@ const ListingApp = () => {
     fetchGroupName();
   }, [selectedDateDetails?.groupId]);
 
-  const sendEmail = async (subjectSuffix, regData, isCancellation) => {
-    try{
-      // Get group name for email subject and content
-      const groupsSnapshot = await getDocs(collection(db, "groups"));
-      const groupData = groupsSnapshot.docs
-                        .filter(doc => doc.data().groupId === selectedDateDetails.groupId)
-                        .map(doc => doc.data())[0];
-      
-      const groupName = groupData?.name || 'basketbo-lista';
-      
-      const toEmail = regData.email ? regData.email : 'boss.basketbolista@gmail.com';
-      const regEmailDoc = {
-        to: toEmail,
-        message: {
-          subject: `[${groupName}] ${subjectSuffix}`,
-          html: `<b>Group</b>: ${groupName}<br><b>Date</b>: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        weekday: "short",
-                      }).toUpperCase().replace(",", "") || ''}<br><b>Time</b>: ${new Date(`1970-01-01T${selectedDateDetails.startTime}:00`).toLocaleTimeString("en-GB", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true}).toUpperCase() + ' - ' + new Date(`1970-01-01T${selectedDateDetails.endTime}:00`).toLocaleTimeString("en-GB", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true}).toUpperCase() || ''}<br><b>Venue</b>: ${selectedDateDetails.venue || ''}<br><br><b>Name</b>: ${regData.name || ''}`
-        }
-      }
-
-      if(!isCancellation){
-        regEmailDoc.message.html += `<br><b>PIN</b>: ${regData.pin || ''}`;
-      }
-      if(isCancellation){
-        const adminEmails = [];
-        if (groupData) {
-          // Add main admin email
-          if (groupData.adminEmail) {
-            adminEmails.push(groupData.adminEmail);
-          }
-          // Add co-admin emails
-          if (groupData.coAdmins && Array.isArray(groupData.coAdmins)) {
-            adminEmails.push(...groupData.coAdmins);
-          }
-        }
-        
-        if(adminEmails.length > 0){
-          regEmailDoc.bcc = adminEmails.filter(email => email); // Remove any empty emails
-        }
-      }
-      regEmailDoc.message.html += `<br><br><b>Link</b>: ${window.location.href}`;
-      addDoc(collection(db, "mail"), regEmailDoc);
-    }catch (error) {
-      console.error("Error saving email: ", error);
-    }
-  };
-
-  const notifyNextInWaitlist = async (updatedRegList) => {
-    try{
-      if(updatedRegList.length >= selectedDateDetails.max){
-        const regData = updatedRegList[selectedDateDetails.max - 1];
-        if(regData){
-          // Get group name for email subject and content
-          const groupsSnapshot = await getDocs(collection(db, "groups"));
-          const groupData = groupsSnapshot.docs
-                            .filter(doc => doc.data().groupId === selectedDateDetails.groupId)
-                            .map(doc => doc.data())[0];
-          
-          const groupName = groupData?.name || 'basketbo-lista';
-          
-          const toEmail = regData.email ? regData.email : 'boss.basketbolista@gmail.com';
-          const regEmailDoc = {
-            to: toEmail,
-            message: {
-              subject: `[${groupName}] Waitlist upgraded to registered`,
-              html: `<b>Group</b>: ${groupName}<br><b>Date</b>: ${new Date(selectedDateDetails.date).toLocaleDateString("en-GB", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            weekday: "short",
-                          }).toUpperCase().replace(",", "") || ''}<br><b>Time</b>: ${new Date(`1970-01-01T${selectedDateDetails.startTime}:00`).toLocaleTimeString("en-GB", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                            hour12: true}).toUpperCase() + ' - ' + new Date(`1970-01-01T${selectedDateDetails.endTime}:00`).toLocaleTimeString("en-GB", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                            hour12: true}).toUpperCase() || ''}<br><b>Venue</b>: ${selectedDateDetails.venue || ''}<br><br><b>Name</b>: ${regData.name || ''}`
-            }
-          }
-
-          const adminEmails = [];
-          if (groupData) {
-            // Add main admin email
-            if (groupData.adminEmail) {
-              adminEmails.push(groupData.adminEmail);
-            }
-            // Add co-admin emails
-            if (groupData.coAdmins && Array.isArray(groupData.coAdmins)) {
-              adminEmails.push(...groupData.coAdmins);
-            }
-          }
-          
-          if(adminEmails.length > 0){
-            regEmailDoc.bcc = adminEmails.filter(email => email); // Remove any empty emails
-          }
-          regEmailDoc.message.html += `<br><br><b>Link</b>: ${window.location.href}`;
-          addDoc(collection(db, "mail"), regEmailDoc);
-        }
-      }
-    }catch (error) {
-      console.error("Error saving email: ", error);
-    }
-  };
-
   const downloadIcs = async () => {
     const formatDateTime = (date, time) => {
       return new Date(`${date}T${time}:00`).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
@@ -459,11 +345,10 @@ END:VCALENDAR`;
       let addedDocRef;
       addedDocRef = await addDoc(collection(docRef, "registrations"), newRegistration);
       setRegistrations([...fetchedRegistrations, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+      // The confirmation email (if the spot isn't on the waitlist) is sent by
+      // the onRegistrationCreated Cloud Function, to the player or, if no
+      // email was given, the group's main admin.
       alert("Registered successfully!");
-
-      if(regEmail || user?.email){
-        sendEmail('Registration Completed', newRegistration, false);
-      }
       setTimeout(() => setIsSubmitting(false), 1000);
     } catch (error) {
       console.error("Error registering: ", error);
@@ -557,14 +442,11 @@ END:VCALENDAR`;
         }
       }
 
-      sendEmail(`${isWaitlist ? 'Waitlist ' : ''}Cancellation`, regData, true);
-
+      // The onRegistrationDeleted Cloud Function sends the cancellation email
+      // and, if this frees up a confirmed spot, emails whoever gets upgraded
+      // off the waitlist (each to the player, or the main admin if no email).
       await deleteDoc(docRef);
-      const updatedRegList = registrations.filter((reg) => reg.id !== id);
-      setRegistrations(updatedRegList);
-      if(!isWaitlist){
-        setTimeout(() => notifyNextInWaitlist(updatedRegList), 1000);
-      }
+      setRegistrations(registrations.filter((reg) => reg.id !== id));
     } catch (error) {
       console.error("Error cancelling registration: ", error);
     }
