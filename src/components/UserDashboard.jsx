@@ -497,7 +497,7 @@ const UserDashboard = () => {
                           onClick={() => openHeatcheckStats(user, reg.event)}
                           className="w-full mt-2"
                         >
-                          View My Stats on HeatCheck
+                          See stats in HeatCheck
                         </Button>
                       )}
                     </div>

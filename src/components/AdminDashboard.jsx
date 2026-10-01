@@ -42,7 +42,7 @@ import {
   signOut
 } from "firebase/auth";
 import blIcon from "@/assets/blIcon.png";
-import { isHeatcheckEnabled, isHeatcheckLink } from "@/heatcheck";
+import { isHeatcheckEnabled, isHeatcheckLink, heatcheckKey } from "@/heatcheck";
 
 const AdminDashboard = () => {
   const [user, setUser] = useState(null);
@@ -366,6 +366,7 @@ const AdminDashboard = () => {
         isOpenForRegistration: eventFormData.isOpenForRegistration,
         requireGoogleLogin: eventFormData.requireGoogleLogin,
         heatcheckUrl,
+        heatcheckKey: heatcheckKey(heatcheckUrl),
         // Only newly-created events get opaque/hash-style links. Events
         // created before this feature existed keep resolving via their
         // original cleartext link, so we never flip this on for an edit.
@@ -1156,7 +1157,7 @@ const AdminDashboard = () => {
                         placeholder={`${import.meta.env.VITE_HEATCHECK_ORIGIN}/...`}
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Registered players signed in with Google get a "My Stats" button that opens this link already signed in to HeatCheck.
+                        Registered players signed in with Google get a "See stats in HeatCheck" button that opens this link already signed in to HeatCheck.
                       </p>
                     </div>
                   )}

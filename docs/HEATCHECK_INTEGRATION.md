@@ -17,13 +17,13 @@ user ID (`sub`), falling back to the verified email address.
 
 ---
 
-## 1. basketbo-lista → HeatCheck ("View my stats")
+## 1. basketbo-lista → HeatCheck ("See stats in HeatCheck")
 
 ### What basketbo-lista sends
 
 The basketbo-lista event admin pastes the **HeatCheck stats link for that
 game** into the event. Registered players signed in with Google then get a
-"My Stats" button, which opens that link in a new tab with two additions:
+"See stats in HeatCheck" button, which opens that link in a new tab with two additions:
 
 ```
 <HeatCheck stats link>?source=basketbo-lista#blToken=<Firebase ID token>
@@ -31,7 +31,7 @@ game** into the event. Registered players signed in with Google then get a
 
 | Part | Meaning |
 |---|---|
-| `<HeatCheck stats link>` | Exactly the link the admin pasted, e.g. `https://heatcheck.app/games/42`. Any existing query parameters are kept. It must be on HeatCheck's origin; basketbo-lista refuses to attach a token to any other site. |
+| `<HeatCheck stats link>` | Exactly the link the admin pasted, e.g. a game-day link like `https://heatcheck.club/game-day/<id>`. Any existing query parameters are kept. It must be on HeatCheck's origin; basketbo-lista refuses to attach a token to any other site. |
 | `source` | Always `basketbo-lista` |
 | `blToken` | Firebase ID token (RS256 JWT) issued by the `basketbo-lista` Firebase project. Valid for up to 1 hour. |
 
@@ -81,7 +81,7 @@ const googleSub = firebase.identities?.["google.com"]?.[0]; // present for googl
 
 > **Reject anonymous sessions** (`sign_in_provider === "anonymous"`).
 > basketbo-lista gives visitors who haven't signed in an anonymous Firebase
-> session. It only shows the "My Stats" button to Google-signed-in users,
+> session. It only shows the "See stats in HeatCheck" button to Google-signed-in users,
 > but HeatCheck must still check.
 
 **3. Server: sign the user into Supabase.** Using the service-role key
@@ -116,13 +116,53 @@ No email is sent in this flow. `generateLink` only returns the token.
 
 ### What HeatCheck needs to send
 
-Link to a basketbo-lista page with the user's **Supabase access token** in the
-fragment:
+A game-day page can link to its basketbo-lista event in either of two ways.
+Use **A** when the HeatCheck admin has pasted a basketbo-lista link, otherwise
+fall back to **B**.
+
+**A. HeatCheck admin pastes the basketbo-lista event link (optional).**
+Give game-days an optional "basketbo-lista event link" field. basketbo-lista
+admins share event links like:
 
 ```
-https://basketbo-lista.com/events?id=<eventId>#hcToken=<Supabase access token>
-https://basketbo-lista.com/user#hcToken=<Supabase access token>       (the user's registrations)
+https://basketbo-lista.com/events?id=<eventId>
+https://basketbo-lista.com/events?groupId=...&date=...&venue=...&startTime=...&endTime=...   (older events)
 ```
+
+Link to the pasted URL as-is, with the token appended:
+
+```ts
+const url = new URL(pastedLink);
+if (url.origin !== "https://basketbo-lista.com") throw new Error("Not a basketbo-lista link");
+url.hash = new URLSearchParams({ hcToken }).toString();
+```
+
+> **Only attach `hcToken` to `https://basketbo-lista.com` links.** Check the
+> origin when the admin saves the link **and** when the link is opened.
+> Otherwise a mistyped or malicious link would send the user's HeatCheck
+> token to another site.
+
+**B. Automatic lookup (no HeatCheck setup).** If the basketbo-lista admin
+pasted this game-day link into their event, pass **the game-day page's own
+URL** in `heatcheck`:
+
+```
+https://basketbo-lista.com/events?heatcheck=<URL-encoded game-day URL>#hcToken=<Supabase access token>
+```
+
+```ts
+const url = new URL("https://basketbo-lista.com/events");
+url.searchParams.set("heatcheck", window.location.href);
+url.hash = new URLSearchParams({ hcToken }).toString();
+```
+
+basketbo-lista opens the event whose admin pasted that game-day link. Only the
+origin and path are compared, so query strings, fragments and a trailing
+slash don't matter. If no event has that link yet, the page shows no event.
+
+Other pages can link to `https://basketbo-lista.com/user#hcToken=...` (the
+player's registered events). The `#hcToken` handling runs on every
+basketbo-lista page.
 
 - Get the token **when the user taps the link**, not when the page renders:
   ```ts
@@ -131,8 +171,8 @@ https://basketbo-lista.com/user#hcToken=<Supabase access token>       (the user'
   ```
 - The user must have signed in to HeatCheck with **Google**, and their email
   must be confirmed.
-- Build the link only for signed-in users. Without `hcToken` the link still
-  works; the user just isn't signed in automatically.
+- Add `hcToken` only for signed-in users. Without it the link still opens the
+  event; the user just isn't signed in automatically.
 
 ### What basketbo-lista does
 
@@ -150,5 +190,5 @@ basketbo-lista's normal sign-in.
 1. **Supabase project URL**, e.g. `https://abcdefgh.supabase.co`.
 2. **Supabase anon / publishable key.** This is the public key already in
    HeatCheck's frontend. **Not** the service-role key.
-3. **HeatCheck's site origin**, e.g. `https://heatcheck.app`. Only links on
+3. **HeatCheck's site origin**, e.g. `https://heatcheck.club`. Only links on
    this origin can be pasted into events and opened with a token.

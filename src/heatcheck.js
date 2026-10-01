@@ -22,6 +22,16 @@ export const isHeatcheckLink = (link) => {
   }
 };
 
+// Stable lookup key for a HeatCheck link: origin + path, without query,
+// fragment or trailing slash. Saved on the event next to heatcheckUrl so a
+// HeatCheck game-day page can link back with its own URL
+// (/events?heatcheck=<url>) and land on the event it was pasted into.
+export const heatcheckKey = (link) => {
+  if (!isHeatcheckLink(link)) return "";
+  const url = new URL(link);
+  return (url.origin + url.pathname).replace(/\/+$/, "");
+};
+
 // HeatCheck → basketbo-lista: if this page was opened with #hcToken=..., strip
 // it from the address bar right away (so it isn't left in history or copied
 // along with the link) and exchange it for a session here.

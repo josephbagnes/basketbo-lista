@@ -20,11 +20,12 @@ const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 const RESEND_FROM = defineString("RESEND_FROM");
 const APP_URL = defineString("APP_URL", { default: "https://basketbo-lista.web.app" });
 // HeatCheck's Supabase project, whose access tokens are accepted by
-// exchangeHeatcheckToken: its URL (https://<ref>.supabase.co) and its public
-// anon/publishable key (not a secret; it's shipped in HeatCheck's frontend).
-// Empty disables the HeatCheck sign-in handoff.
+// exchangeHeatcheckToken: its URL (https://<ref>.supabase.co) and its
+// anon/publishable key. The key is public (it ships in HeatCheck's frontend)
+// but is kept in Secret Manager alongside other credentials anyway.
+// An empty URL disables the HeatCheck sign-in handoff.
 const HEATCHECK_SUPABASE_URL = defineString("HEATCHECK_SUPABASE_URL", { default: "" });
-const HEATCHECK_SUPABASE_ANON_KEY = defineString("HEATCHECK_SUPABASE_ANON_KEY", { default: "" });
+const HEATCHECK_SUPABASE_ANON_KEY = defineSecret("HEATCHECK_SUPABASE_ANON_KEY");
 
 // Emails are only sent for: a registration that lands inside the event's max
 // (not the waitlist), a waitlisted registration getting bumped up when
@@ -221,7 +222,7 @@ const getHeatcheckUser = async (token) => {
   return response.json();
 };
 
-exports.exchangeHeatcheckToken = onCall(async (request) => {
+exports.exchangeHeatcheckToken = onCall({ secrets: [HEATCHECK_SUPABASE_ANON_KEY] }, async (request) => {
   if (!HEATCHECK_SUPABASE_URL.value() || !HEATCHECK_SUPABASE_ANON_KEY.value()) {
     throw new HttpsError("failed-precondition", "HeatCheck sign-in is not configured.");
   }

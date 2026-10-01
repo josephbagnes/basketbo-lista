@@ -14,6 +14,7 @@ import {
   updateDoc,
   query,
   where,
+  limit,
 } from "firebase/firestore";
 import { 
   getAuth, 
@@ -24,7 +25,7 @@ import {
   signOut 
 } from "firebase/auth";
 import blIcon from "@/assets/blIcon.png";
-import { isHeatcheckLink, openHeatcheckStats } from "@/heatcheck";
+import { isHeatcheckLink, openHeatcheckStats, heatcheckKey } from "@/heatcheck";
 
 const ListingApp = () => {
   const [name, setName] = useState("");
@@ -106,6 +107,21 @@ const ListingApp = () => {
           // exposed in the URL, and no other events in the group are fetched.
           const eventSnap = await getDoc(doc(db, "dates", id));
           if (eventSnap.exists()) {
+            const eventData = { id: eventSnap.id, ...eventSnap.data() };
+            setSelectedDate(eventData.id);
+            setSelectedDateDetails(eventData);
+            setIsOpenForRegistration(eventData.isOpenForRegistration ?? false);
+          }
+          return;
+        }
+
+        // Link back from a HeatCheck game-day page: find the event whose
+        // admin pasted that game-day link.
+        const heatcheck = heatcheckKey(urlParams.get("heatcheck"));
+        if (heatcheck) {
+          const eventsQuery = query(collection(db, "dates"), where("heatcheckKey", "==", heatcheck), limit(1));
+          const eventSnap = (await getDocs(eventsQuery)).docs[0];
+          if (eventSnap) {
             const eventData = { id: eventSnap.id, ...eventSnap.data() };
             setSelectedDate(eventData.id);
             setSelectedDateDetails(eventData);
@@ -586,18 +602,18 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
             hour12: true}).toUpperCase()}</p>
           </div>
           <div className="flex space-x-2">
-            <Button onClick={copyDetails} size="sm" className="flex items-center text-xs md:text-sm bg-white px-3 py-2 rounded-lg border" title="Copy Details">
+            <Button onClick={copyDetails} size="sm" variant="outline" className="flex items-center text-xs md:text-sm px-3 py-2 rounded-lg" title="Copy Details">
               <Copy className="w-4 h-4 text-blue-500 mr-1" />
               <span className="hidden sm:inline">Copy</span>
             </Button>
-            <Button onClick={downloadIcs} size="sm" className="flex items-center text-xs md:text-sm bg-white px-3 py-2 rounded-lg border" title="Download Calendar">
+            <Button onClick={downloadIcs} size="sm" variant="outline" className="flex items-center text-xs md:text-sm px-3 py-2 rounded-lg" title="Download Calendar">
               <CalendarArrowDown className="w-4 h-4 text-blue-500 mr-1" />
               <span className="hidden sm:inline">Calendar</span>
             </Button>
             {isHeatcheckLink(selectedDateDetails.heatcheckUrl) && user && registrations.some((reg) => reg.userUid === user.uid || (reg.email && reg.email === user.email)) && (
-              <Button onClick={() => openHeatcheckStats(user, selectedDateDetails)} size="sm" className="flex items-center text-xs md:text-sm bg-white px-3 py-2 rounded-lg border" title="View my stats on HeatCheck">
+              <Button onClick={() => openHeatcheckStats(user, selectedDateDetails)} size="sm" variant="outline" className="flex items-center text-xs md:text-sm px-3 py-2 rounded-lg" title="See stats in HeatCheck">
                 <BarChart3 className="w-4 h-4 text-blue-500 mr-1" />
-                <span className="hidden sm:inline">My Stats</span>
+                <span className="hidden sm:inline">See stats in HeatCheck</span>
               </Button>
             )}
           </div>
