@@ -14,9 +14,15 @@ service cloud.firestore {
     function isGoogleUser() {
       // True only for a real Google sign-in, never for the anonymous
       // fallback (anonymous sign-in is free and instant, so it can't be used
-      // to prove anything about who's asking).
+      // to prove anything about who's asking). Sessions handed over from
+      // HeatCheck sign in with a custom token minted by the
+      // exchangeHeatcheckToken function only after verifying a Google
+      // account; that function sets google_verified, and only it can mint
+      // custom tokens.
       return request.auth != null
-        && request.auth.token.firebase.sign_in_provider == 'google.com';
+        && (request.auth.token.firebase.sign_in_provider == 'google.com'
+          || (request.auth.token.firebase.sign_in_provider == 'custom'
+            && request.auth.token.google_verified == true));
     }
 
     // Group documents (name, adminEmail, coAdmins, public groupId code).

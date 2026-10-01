@@ -1,9 +1,11 @@
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { onDocumentCreated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret, defineString } = require("firebase-functions/params");
 const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
+const { getAuth } = require("firebase-admin/auth");
 const { Resend } = require("resend");
 
 // Same region as the Firestore database, so the triggers fire locally.
@@ -17,6 +19,12 @@ const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 // "basketbo-lista <noreply@basketbo-lista.com>".
 const RESEND_FROM = defineString("RESEND_FROM");
 const APP_URL = defineString("APP_URL", { default: "https://basketbo-lista.web.app" });
+// HeatCheck's Supabase project, whose access tokens are accepted by
+// exchangeHeatcheckToken: its URL (https://<ref>.supabase.co) and its public
+// anon/publishable key (not a secret; it's shipped in HeatCheck's frontend).
+// Empty disables the HeatCheck sign-in handoff.
+const HEATCHECK_SUPABASE_URL = defineString("HEATCHECK_SUPABASE_URL", { default: "" });
+const HEATCHECK_SUPABASE_ANON_KEY = defineString("HEATCHECK_SUPABASE_ANON_KEY", { default: "" });
 
 // Emails are only sent for: a registration that lands inside the event's max
 // (not the waitlist), a waitlisted registration getting bumped up when
@@ -193,3 +201,64 @@ exports.onRegistrationDeleted = onDocumentDeleted(
     if (failed) throw failed.reason;
   }
 );
+
+// Cross-app sign-in from HeatCheck. HeatCheck links here with its Supabase
+// access token for the user (#hcToken=...); the client hands it to this
+// function, which asks HeatCheck's Supabase who the token belongs to, requires
+// a verified Google identity, finds or creates the same Google user here, and
+// returns a custom token the client signs in with.
+const getHeatcheckUser = async (token) => {
+  // Supabase validates the token itself (signature, expiry, revoked
+  // sessions), so this works whichever JWT signing keys HeatCheck uses and
+  // needs no HeatCheck secrets.
+  const response = await fetch(`${HEATCHECK_SUPABASE_URL.value().replace(/\/$/, "")}/auth/v1/user`, {
+    headers: { apikey: HEATCHECK_SUPABASE_ANON_KEY.value(), Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    logger.warn("Rejected HeatCheck token", { status: response.status });
+    throw new HttpsError("unauthenticated", "Invalid or expired HeatCheck token.");
+  }
+  return response.json();
+};
+
+exports.exchangeHeatcheckToken = onCall(async (request) => {
+  if (!HEATCHECK_SUPABASE_URL.value() || !HEATCHECK_SUPABASE_ANON_KEY.value()) {
+    throw new HttpsError("failed-precondition", "HeatCheck sign-in is not configured.");
+  }
+  const token = request.data?.token;
+  if (typeof token !== "string" || !token) {
+    throw new HttpsError("invalid-argument", "Missing token.");
+  }
+
+  const heatcheckUser = await getHeatcheckUser(token);
+  const google = heatcheckUser.identities?.find((identity) => identity.provider === "google");
+  const googleUid = google?.identity_data?.sub || google?.id;
+  const email = google?.identity_data?.email || heatcheckUser.email;
+  if (!googleUid || !email || !heatcheckUser.email_confirmed_at) {
+    throw new HttpsError("permission-denied", "Only verified Google accounts can sign in from HeatCheck.");
+  }
+  const displayName = google.identity_data?.full_name || google.identity_data?.name;
+  const photoURL = google.identity_data?.avatar_url || google.identity_data?.picture;
+
+  const auth = getAuth();
+  let user = await auth.getUserByProviderUid("google.com", googleUid).catch(() => null);
+  user ??= await auth.getUserByEmail(email).catch(() => null);
+  if (!user) {
+    user = await auth.createUser({
+      email,
+      emailVerified: true,
+      ...(displayName && { displayName }),
+      ...(photoURL && { photoURL }),
+    });
+    // Linking the Google identity means a later "Sign in with Google" here
+    // lands on this same account instead of creating a second one.
+    user = await auth.updateUser(user.uid, {
+      providerToLink: { providerId: "google.com", uid: googleUid, email, ...(displayName && { displayName }) },
+    });
+  }
+
+  // Custom-token sessions report sign_in_provider "custom", so this claim is
+  // what firestore.rules checks to treat them like a Google sign-in. Only
+  // this server can mint custom tokens, so the claim can't be forged.
+  return { customToken: await auth.createCustomToken(user.uid, { google_verified: true }) };
+});
