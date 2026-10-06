@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Copy, Trash, Home, User, LogOut, CalendarArrowDown, BarChart3 } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Copy, Trash, Home, User, LogOut, CalendarArrowDown, BarChart3, Loader2 } from "lucide-react";
 import { db } from "@/firebase";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,10 @@ const ListingApp = () => {
   const [selectedDateDetails, setSelectedDateDetails] = useState(null);
   const [isOpenForRegistration, setIsOpenForRegistration] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // State updates aren't visible until the next render, so rapid repeat
+  // clicks can all read isSubmitting as false. The ref flips synchronously
+  // on the first click and blocks the rest.
+  const submittingRef = useRef(false);
   const [user, setUser] = useState(null);
   const [registrationMethod, setRegistrationMethod] = useState("pin"); // "pin" or "oauth"
   const [authLoading, setAuthLoading] = useState(false);
@@ -277,8 +281,18 @@ END:VCALENDAR`;
   };
 
   const handleRegister = async () => {
-    if(isSubmitting) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await submitRegistration();
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  };
 
+  const submitRegistration = async () => {
     // Validation for PIN method
     if (effectiveMethod === "pin") {
       if (!name || name.length < 1 || name.length > 20) {
@@ -357,18 +371,15 @@ END:VCALENDAR`;
         }),
       };
 
-      setIsSubmitting(true);
-
-      let addedDocRef;
-      addedDocRef = await addDoc(collection(docRef, "registrations"), newRegistration);
+      const addedDocRef = await addDoc(collection(docRef, "registrations"), newRegistration);
       setRegistrations([...fetchedRegistrations, { id: addedDocRef.id, ...newRegistration }].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
       // The confirmation email (if the spot isn't on the waitlist) is sent by
       // the onRegistrationCreated Cloud Function, to the player or, if no
       // email was given, the group's main admin.
       alert("Registered successfully!");
-      setTimeout(() => setIsSubmitting(false), 1000);
     } catch (error) {
       console.error("Error registering: ", error);
+      alert("Registration failed. Please try again.");
     }
   };
 
@@ -755,7 +766,12 @@ ${(registrations || []).slice(selectedDateDetails.max, registrations.length).map
               className="text-md p-2 mt-4 rounded-xl w-full"
               disabled={isSubmitting || (effectiveMethod === "oauth" && !user)}
             >
-              {isSubmitting ? "Registering..." : "Register for Event"}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Registering...
+                </>
+              ) : "Register for Event"}
             </Button>
 
             {effectiveMethod === "oauth" && !user && (

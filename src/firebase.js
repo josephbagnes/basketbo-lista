@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore";
 import { getAuth, onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { signInFromHeatcheckLink } from "@/heatcheck";
 
 const firebaseConfig = {
   
@@ -18,9 +19,16 @@ export const db = getFirestore(app);
 // signed in. This runs once here since every page shares the same Auth
 // singleton via getAuth().
 const auth = getAuth(app);
+// A link from HeatCheck carries the user's login; finish that sign-in before
+// falling back to anonymous, so a throwaway anonymous session isn't created
+// only to be replaced a moment later.
+const heatcheckSignIn = signInFromHeatcheckLink(app, auth);
 onAuthStateChanged(auth, (user) => {
   if (!user) {
-    signInAnonymously(auth).catch((error) => {
+    heatcheckSignIn.then(() => {
+      if (auth.currentUser) return;
+      return signInAnonymously(auth);
+    }).catch((error) => {
       console.error("Anonymous sign-in failed:", error);
     });
   }

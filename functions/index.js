@@ -29,11 +29,12 @@ const HEATCHECK_SUPABASE_ANON_KEY = defineSecret("HEATCHECK_SUPABASE_ANON_KEY");
 
 // Emails are only sent for: a registration that lands inside the event's max
 // (not the waitlist), a waitlisted registration getting bumped up when
-// someone ahead of it cancels, and cancellations. Each is exactly one email,
-// to the player, or to the group's main admin if the player has no email
-// (Resend counts every to/cc/bcc recipient as a separate email). All are
-// decided here on the server from the registrations collection, so the
-// client can't trigger arbitrary emails.
+// someone ahead of it cancels, and cancellations. Each player email is
+// exactly one recipient (Resend counts every to/cc/bcc recipient as a
+// separate email). On top of that, each cancellation sends the main admin
+// one summary of who cancelled and who got upgraded. All are decided here on
+// the server from the registrations collection, so the client can't trigger
+// arbitrary emails.
 
 const escapeHtml = (value) => String(value ?? "")
   .replace(/&/g, "&amp;")
@@ -97,37 +98,64 @@ const isPastEvent = (date) => {
   return !date || date < yesterday;
 };
 
-const sendEmail = async ({ subject, eventId, event, reg, includePin, idempotencyKey }) => {
-  const group = await getGroup(event.groupId);
-  const groupName = group.name || "basketbo-lista";
-  const to = reg.email || group.adminEmail;
-  if (!to) return;
+const eventDetailsHtml = (groupName, event) => `<b>Group</b>: ${escapeHtml(groupName)}`
+  + `<br><b>Date</b>: ${escapeHtml(formatDate(event.date))}`
+  + `<br><b>Time</b>: ${escapeHtml(`${formatTime(event.startTime)} - ${formatTime(event.endTime)}`)}`
+  + `<br><b>Venue</b>: ${escapeHtml(event.venue)}`;
 
-  let html = `<b>Group</b>: ${escapeHtml(groupName)}`
-    + `<br><b>Date</b>: ${escapeHtml(formatDate(event.date))}`
-    + `<br><b>Time</b>: ${escapeHtml(`${formatTime(event.startTime)} - ${formatTime(event.endTime)}`)}`
-    + `<br><b>Venue</b>: ${escapeHtml(event.venue)}`
-    + `<br><br><b>Name</b>: ${escapeHtml(reg.name)}`;
+const deliver = async ({ to, subject, html, idempotencyKey }) => {
+  const resend = new Resend(RESEND_API_KEY.value());
+  const { error } = await resend.emails.send({ from: RESEND_FROM.value(), to, subject, html }, { idempotencyKey });
+  if (error) {
+    // Throwing lets the trigger retry (if retries are enabled); the
+    // idempotency key keeps a retry from sending a duplicate.
+    throw new Error(`Resend error: ${error.name}: ${error.message}`);
+  }
+  logger.info("Sent email", { subject, idempotencyKey });
+};
+
+// Email to the player. Without a player email it goes to the main admin
+// instead only when adminFallback is set; cancellations and upgrades skip it
+// because the admin already gets sendAdminCancellation.
+const sendPlayerEmail = async ({ subject, eventId, event, group, reg, includePin, adminFallback, idempotencyKey }) => {
+  const to = reg.email || (adminFallback && group.adminEmail);
+  if (!to) return;
+  const groupName = group.name || "basketbo-lista";
+
+  let html = eventDetailsHtml(groupName, event) + `<br><br><b>Name</b>: ${escapeHtml(reg.name)}`;
   // The PIN only ever goes to the player themselves, never the admin fallback.
   if (includePin && reg.pin && reg.email) {
     html += `<br><b>PIN</b>: ${escapeHtml(reg.pin)}`;
   }
   html += `<br><br><b>Link</b>: ${escapeHtml(eventLink(eventId, event))}`;
 
-  const resend = new Resend(RESEND_API_KEY.value());
-  const { error } = await resend.emails.send({
-    from: RESEND_FROM.value(),
-    to,
-    subject: `[${groupName}] ${subject}`,
-    html,
-  }, { idempotencyKey });
+  await deliver({ to, subject: `[${groupName}] ${subject}`, html, idempotencyKey });
+};
 
-  if (error) {
-    // Throwing lets the trigger retry (if retries are enabled); the
-    // idempotency key keeps a retry from sending a duplicate.
-    throw new Error(`Resend error: ${error.name}: ${error.message}`);
+// One email to the main admin per cancellation, combining who cancelled and
+// who (if anyone) moved up from the waitlist into the freed spot.
+const sendAdminCancellation = async ({ eventId, event, group, cancelled, wasWaitlisted, promoted, remainingCount, idempotencyKey }) => {
+  if (!group.adminEmail) return;
+  const groupName = group.name || "basketbo-lista";
+  const contact = (reg) => (reg.email ? ` (${escapeHtml(reg.email)})` : " (no email on file)");
+
+  let html = eventDetailsHtml(groupName, event)
+    + `<br><br><b>Cancelled</b>: ${escapeHtml(cancelled.name)}${contact(cancelled)}`
+    + ` from the ${wasWaitlisted ? "waitlist" : "registered list"}`;
+  if (promoted) {
+    html += `<br><b>Upgraded from waitlist</b>: ${escapeHtml(promoted.name)}${contact(promoted)}`;
+    if (!promoted.email) html += "<br><i>They have no email on file, so please let them know.</i>";
+  } else if (!wasWaitlisted) {
+    html += "<br><b>Upgraded from waitlist</b>: none (waitlist is empty)";
   }
-  logger.info("Sent email", { subject, eventId, regId: reg.id });
+  html += `<br><br><b>Registered</b>: ${Math.min(remainingCount, event.max)} / ${event.max}`
+    + `<br><b>Waitlist</b>: ${Math.max(remainingCount - event.max, 0)}`
+    + `<br><br><b>Link</b>: ${escapeHtml(eventLink(eventId, event))}`;
+
+  const subject = promoted
+    ? `${cancelled.name} cancelled, ${promoted.name} upgraded from waitlist`
+    : `${cancelled.name} cancelled${wasWaitlisted ? " (waitlist)" : ""}`;
+  await deliver({ to: group.adminEmail, subject: `[${groupName}] Admin: ${subject}`, html, idempotencyKey });
 };
 
 exports.onRegistrationCreated = onDocumentCreated(
@@ -146,12 +174,14 @@ exports.onRegistrationCreated = onDocumentCreated(
     // upgraded (see onRegistrationDeleted).
     if (position < 0 || position >= event.max) return;
 
-    await sendEmail({
+    await sendPlayerEmail({
       subject: "Registration Confirmed",
       eventId: dateId,
       event,
+      group: await getGroup(event.groupId),
       reg,
       includePin: true,
+      adminFallback: true,
       idempotencyKey: `registered-${dateId}-${regId}`,
     });
   }
@@ -175,23 +205,36 @@ exports.onRegistrationDeleted = onDocumentDeleted(
     const deletedPosition = remaining.filter((r) => byTimestamp(r, deleted) < 0).length;
     const wasWaitlisted = deletedPosition >= event.max;
 
-    const sends = [sendEmail({
-      subject: `${wasWaitlisted ? "Waitlist " : ""}Cancellation`,
-      eventId: dateId,
-      event,
-      reg: deleted,
-      includePin: false,
-      idempotencyKey: `cancelled-${dateId}-${deleted.id}`,
-    })];
+    const group = await getGroup(event.groupId);
+    const promoted = !wasWaitlisted && remaining.length >= event.max ? remaining[event.max - 1] : null;
 
-    if (!wasWaitlisted && remaining.length >= event.max) {
-      const promoted = remaining[event.max - 1];
-      sends.push(sendEmail({
+    const sends = [
+      sendPlayerEmail({
+        subject: `${wasWaitlisted ? "Waitlist " : ""}Cancellation`,
+        eventId: dateId,
+        event,
+        group,
+        reg: deleted,
+        idempotencyKey: `cancelled-${dateId}-${deleted.id}`,
+      }),
+      sendAdminCancellation({
+        eventId: dateId,
+        event,
+        group,
+        cancelled: deleted,
+        wasWaitlisted,
+        promoted,
+        remainingCount: remaining.length,
+        idempotencyKey: `admin-cancelled-${dateId}-${deleted.id}`,
+      }),
+    ];
+    if (promoted) {
+      sends.push(sendPlayerEmail({
         subject: "Waitlist upgraded to registered",
         eventId: dateId,
         event,
+        group,
         reg: promoted,
-        includePin: false,
         idempotencyKey: `upgraded-${dateId}-${promoted.id}`,
       }));
     }
